@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "tools": {
+    "yt-dlp": {
+      "name": "yt-dlp",
+      "upstream": "https://github.com/yt-dlp/yt-dlp",
+      "license": "Unlicense",
+      "platforms": {
+        "windows-x64": "yt-dlp.exe"
+      }
+    },
+    "ffmpeg": {
+      "name": "FFmpeg",
+      "upstream": "https://ffmpeg.org",
+      "license": "LGPL-2.1+",
+      "build_license": "GPL-3.0+ or LGPL-2.1+",
+      "build_source": "https://ffmpeg.org/download.html",
+      "platforms": {
+        "windows-x64": "ffmpeg.exe"
+      }
+    },
+    "ffprobe": {
+      "name": "ffprobe",
+      "upstream": "https://ffmpeg.org",
+      "license": "LGPL-2.1+",
+      "build_license": "GPL-3.0+ or LGPL-2.1+",
+      "build_source": "https://ffmpeg.org/download.html",
+      "platforms": {
+        "windows-x64": "ffprobe.exe"
+      }
+    },
+    "yutto": {
+      "name": "yutto",
+      "upstream": "https://github.com/yutto-dev/yutto",
+      "license": "GPL-3.0",
+      "platforms": {
+        "windows-x64": "yutto.exe"
+      }
+    },
+    "streamlink": {
+      "name": "Streamlink",
+      "upstream": "https://github.com/streamlink/streamlink",
+      "license": "BSD-2-Clause",
+      "platforms": {
+        "windows-x64": "streamlink.exe"
+      }
+    },
+    "n-m3u8dl-re": {
+      "name": "N_m3u8DL-RE",
+      "upstream": "https://github.com/nilaoda/N_m3u8DL-RE",
+      "license": "MIT",
+      "platforms": {
+        "windows-x64": "N_m3u8DL-RE.exe"
+      }
+    },
+    "gallery-dl": {
+      "name": "gallery-dl",
+      "upstream": "https://github.com/mikf/gallery-dl",
+      "license": "GPL-2.0",
+      "platforms": {
+        "windows-x64": "gallery-dl.exe"
+      }
+    }
+  }
+}

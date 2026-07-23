@@ -69,4 +69,6 @@ Structured status values:
 
 ## Current Phase
 
-This is the **acquisition workflow phase**. Basic workspace layout, tool indexing, root location, tool checking, ProcessRunner, yt-dlp adapter, ffprobe validator, static routing table, multi-backend failover, acquisition project management, task queue, coverage reports, and human editor handoff are implemented. Release assembly and end-to-end verification will be added next.
+This is the **initial release phase**. All planned capabilities are implemented: portable workspace layout, tool indexing and checking, controlled process execution, yt-dlp probing and download, ffprobe validation, multi-backend routing and failover, acquisition project management with task queue and reports, and Release assembly with end-to-end isolation verification. See references/capability-matrix.md for details.
+
+**Do not claim capabilities not listed in the capability matrix.**
