@@ -65,17 +65,12 @@ def find_project_root(start: Path | None = None) -> Path:
         start = start.resolve()
 
     for parent in [start] + list(start.parents):
-        if (parent / MARKER_FILE).is_file():
-            candidate = parent
-            if (candidate / SKILL_FILE).is_file() and (candidate / TOOLS_JSON_REL).is_file():
-                return candidate
-            for p in [candidate] + list(candidate.parents):
-                if (
-                    (p / MARKER_FILE).is_file()
-                    and (p / SKILL_FILE).is_file()
-                    and (p / TOOLS_JSON_REL).is_file()
-                ):
-                    return p
+        if (
+            (parent / MARKER_FILE).is_file()
+            and (parent / SKILL_FILE).is_file()
+            and (parent / TOOLS_JSON_REL).is_file()
+        ):
+            return parent
 
     cwd = Path.cwd().resolve()
     if cwd != start:
@@ -103,32 +98,7 @@ def get_paths(start: Path | None = None) -> dict[str, Path]:
     }
 
 
-FORBIDDEN_SEGMENTS = {".."}
 FORBIDDEN_CHARS = re.compile(r'[\x00-\x1f<>:"|?*]')
-RESERVED_NAMES = {
-    "CON",
-    "PRN",
-    "AUX",
-    "NUL",
-    "COM1",
-    "COM2",
-    "COM3",
-    "COM4",
-    "COM5",
-    "COM6",
-    "COM7",
-    "COM8",
-    "COM9",
-    "LPT1",
-    "LPT2",
-    "LPT3",
-    "LPT4",
-    "LPT5",
-    "LPT6",
-    "LPT7",
-    "LPT8",
-    "LPT9",
-}
 
 
 def _validate_tool_path(raw: str, tool_name: str) -> str:
