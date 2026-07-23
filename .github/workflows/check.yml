@@ -2,7 +2,6 @@ name: Check
 
 on:
   pull_request:
-    branches: [main]
     types: [opened, edited, reopened, synchronize]
   push:
     branches: [main]
@@ -13,9 +12,9 @@ permissions:
   pull-requests: read
 
 jobs:
-  check:
+  check-ubuntu:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,20 +22,55 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.12.7'
+          python-version: '3.12'
 
-      - name: Install YAML validation dependency
-        run: python -m pip install --disable-pip-version-check PyYAML==6.0.3
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev]"
 
-      - name: Validate Pull Request body
-        if: github.event_name == 'pull_request'
-        env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-        run: python scripts/validate_pr_body.py
+      - name: Ruff format check
+        run: python -m ruff format --check .
 
-      - name: Test Pull Request body validator
-        run: python scripts/test_validate_pr_body.py
+      - name: Ruff lint check
+        run: python -m ruff check .
 
-      - name: Validate
-        run: bash scripts/validate.sh
-        shell: bash
+      - name: Pytest
+        run: python -m pytest -v
+
+      - name: Smoke test locate_root
+        run: python skill/mediaharbor/scripts/locate_root.py --json
+
+      - name: Smoke test check_tools
+        run: python skill/mediaharbor/scripts/check_tools.py --json
+
+  check-windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Ruff format check
+        run: python -m ruff format --check .
+
+      - name: Ruff lint check
+        run: python -m ruff check .
+
+      - name: Pytest
+        run: python -m pytest -v
+
+      - name: Smoke test locate_root
+        run: python skill/mediaharbor/scripts/locate_root.py --json
+
+      - name: Smoke test check_tools
+        run: python skill/mediaharbor/scripts/check_tools.py --json
+
+      - name: PowerShell validation
+        run: powershell -ExecutionPolicy Bypass -File scripts/validate.ps1
