@@ -1,6 +1,8 @@
 # Contributing to MediaHarbor
 
 开始前读取 [AGENTS.md](AGENTS.md)。Agent 操作遵循 AgenticWonderwall 工作流。
+版本、采用范围和 GitHub 仓库设置门禁参见
+[AgenticWonderwall 采纳记录](docs/agenticwonderwall-adoption.md)。
 
 ## 两条任务路径
 

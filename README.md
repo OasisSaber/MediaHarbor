@@ -33,6 +33,8 @@ MediaHarbor 是一个放入 Agent 工作区即可使用的便携式视频素材�
 ## Development
 
 开发本仓库的编码 Agent 和贡献者参见 [`AGENTS.md`](AGENTS.md) 和 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
+本项目的 AgenticWonderwall 采纳范围、版本和仓库设置门禁记录在
+[`docs/agenticwonderwall-adoption.md`](docs/agenticwonderwall-adoption.md)。
 
 ## License
 

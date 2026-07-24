@@ -14,7 +14,9 @@
   bash scripts/validate.sh
   ```
 - 合并方式：只接受人类决定的 Squash Merge
-- 工作流来源：AgenticWonderwall v1.0.0
+- 工作流来源：[AgenticWonderwall v1.0.0](https://github.com/OasisSaber/AgenticWonderwall)
+- 采用日期：2026-07-30
+- 首次演练任务：[Issue #30](https://github.com/OasisSaber/MediaHarbor/issues/30)
 
 ## 权威顺序
 
