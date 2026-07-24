@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "platforms_note": "Windows x64 is the primary supported platform. Linux/macOS paths are best-effort placeholders.",
+  "tools": {
+    "yt-dlp": {
+      "roles": ["probe", "vod", "playlist", "subtitle", "metadata"],
+      "required": true,
+      "platforms": {
+        "windows-x64": "yt-dlp/yt-dlp.exe",
+        "linux-x64": "yt-dlp/yt-dlp",
+        "macos-arm64": "yt-dlp/yt-dlp"
+      }
+    },
+    "ffmpeg": {
+      "roles": ["merge", "convert"],
+      "required": true,
+      "platforms": {
+        "windows-x64": "ffmpeg/ffmpeg.exe",
+        "linux-x64": "ffmpeg/ffmpeg",
+        "macos-arm64": "ffmpeg/ffmpeg"
+      }
+    },
+    "ffprobe": {
+      "roles": ["validate"],
+      "required": true,
+      "platforms": {
+        "windows-x64": "ffmpeg/ffprobe.exe",
+        "linux-x64": "ffmpeg/ffprobe",
+        "macos-arm64": "ffmpeg/ffprobe"
+      }
+    },
+    "yutto": {
+      "roles": ["bilibili"],
+      "required": false,
+      "platforms": {
+        "windows-x64": "yutto/yutto.exe",
+        "linux-x64": "yutto/yutto",
+        "macos-arm64": "yutto/yutto"
+      }
+    },
+    "streamlink": {
+      "roles": ["live"],
+      "required": false,
+      "platforms": {
+        "windows-x64": "streamlink/streamlink.exe",
+        "linux-x64": "streamlink/streamlink",
+        "macos-arm64": "streamlink/streamlink"
+      }
+    },
+    "n-m3u8dl-re": {
+      "roles": ["hls", "dash", "mss"],
+      "required": false,
+      "platforms": {
+        "windows-x64": "N_m3u8DL-RE/N_m3u8DL-RE.exe",
+        "linux-x64": "N_m3u8DL-RE/N_m3u8DL-RE",
+        "macos-arm64": "N_m3u8DL-RE/N_m3u8DL-RE"
+      }
+    },
+    "gallery-dl": {
+      "roles": ["social", "gallery", "post-media"],
+      "required": false,
+      "platforms": {
+        "windows-x64": "gallery-dl/gallery-dl.exe",
+        "linux-x64": "gallery-dl/gallery-dl",
+        "macos-arm64": "gallery-dl/gallery-dl"
+      }
+    }
+  }
+}

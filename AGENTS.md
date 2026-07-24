@@ -5,16 +5,16 @@
 
 ## 项目事实
 
-- 项目名：AgenticWonderwall
-- 项目目标：维护面向个人开发者的单 Agent GitHub Flow + Jujutsu 工作流模板
+- 项目名：MediaHarbor
+- 项目目标：维护一个工作区内便携式 Agent Skill 工具包，帮助 Agent 根据已有文案检索、下载、验证并整理视频素材
+- 技术栈：Python 3.11+、外部下载工具 CLI、FFmpeg/ffprobe、JSON/JSONL、Markdown
 - 默认分支：`main`
 - 验证入口：
   ```bash
   bash scripts/validate.sh
   ```
 - 合并方式：只接受人类决定的 Squash Merge
-
-采用到其他项目时，应更新本节中的项目目标、技术栈、验证命令和受保护分支。
+- 工作流来源：AgenticWonderwall v1.0.0
 
 ## 权威顺序
 

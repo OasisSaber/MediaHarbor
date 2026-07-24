@@ -1,78 +1,38 @@
-# AgenticWonderwall
+# MediaHarbor
 
-A minimal single-Agent workflow for GitHub and Jujutsu.
+MediaHarbor 是一个放入 Agent 工作区即可使用的便携式视频素材采集工具包。**不采用传统安装方式。**
 
-AgenticWonderwall 是面向个人开发者的单 Agent 工作流，是 GitHub Flow 与 Jujutsu 的轻量适配层，也是可复制的规则模板与稳定版本接口。
+## 部署
 
-它不是 Agent 服务、多 Agent 编排平台、Web 或 API 服务、CLI 产品、Agent 运行时、自动发布机器人或项目管理系统。
+下载完整 Release，将整个 `MediaHarbor/` 文件夹放入 Agent 工作区。
 
-## 稳定接口
+## Agent 入口
 
-| 用途 | 入口 |
-| --- | --- |
-| Agent 入口 | [AGENTS.md](AGENTS.md) |
-| 人类入口 | [README.md](README.md) |
-| 维护入口 | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| 采用指南 | [docs/adoption-guide.md](docs/adoption-guide.md) |
-| 验证入口 | `bash scripts/validate.sh` |
-| 复制接口 | GitHub Template Repository |
-| 版本接口 | Git tag / GitHub Release |
+让 Agent 按顺序读取：
 
-## 快速开始
+1. [`AGENT_READ_ME_FIRST.md`](AGENT_READ_ME_FIRST.md)
+2. [`skill/mediaharbor/SKILL.md`](skill/mediaharbor/SKILL.md)
+3. [`download-tools/tools.json`](download-tools/tools.json)
 
-1. 使用 GitHub Template Repository 创建新仓库，或只复制 `AGENTS.md`。模板只复制仓库文件，不会复制本地 `.jj` 状态。
-2. 在本地初始化 Jujutsu 工作区；二选一：
+首次执行时在 MediaHarbor 根目录自动创建 `output/`，所有素材产物写入 `output/<project-name>/`。
 
-   ```bash
-   # 路径 A：直接使用 Jujutsu 克隆
-   jj git clone <repository-url>
-   cd <repository>
-   ```
+## 工作流
 
-   ```bash
-   # 路径 B：仓库已通过 Git 克隆
-   git clone <repository-url>
-   cd <repository>
-   jj git init --colocate
-   ```
+已有文案 → Agent 分析人物、事件、年份、地点和视觉需求 → Agent 跨互联网搜索候选页面 → Agent 将候选 URL 交给 MediaHarbor → MediaHarbor 选择并调用本地下载工具 → 下载视频、字幕、缩略图和元数据 → ffprobe 验证 → 重命名、归档和生成素材清单 → 人工剪辑
 
-   初始化后运行：
+## 三方角色
 
-   ```bash
-   jj status
-   jj git remote list
-   jj log -r 'main | main@origin' -n 5
-   ```
+- **Agent**：理解文案、生成检索词、搜索和筛选候选 URL、调用 Skill
+- **MediaHarbor**：发现工具、受控调用、有限容灾、验证、整理和报告
+- **人工**：判断镜头是否合适并完成剪辑
 
-3. 在 `AGENTS.md` 的“项目事实”中填写项目目标、技术栈、验证命令和默认分支。
-4. 按项目需要替换验证脚本和持续集成配置，并按 [仓库设置说明](docs/repository-settings.md) 由人类配置 GitHub 保护规则。
-5. 开始新任务前运行 `jj git fetch` 同步远端基线；初始化后才能使用本工作流规定的 `jj status`、`jj new` 和 bookmark 命令。
-6. 复杂任务使用 GitHub Issue 记录边界；小型低风险任务使用当前会话中的明确人类授权。
-7. 使用一个 jj change 完成实现、验证与 Agent 自审，通过 Pull Request 交给人类决定是否 Squash Merge。
+## 能力与限制
 
-## 本仓库验证
+参见 [`skill/mediaharbor/references/capability-matrix.md`](skill/mediaharbor/references/capability-matrix.md)
 
-```bash
-bash scripts/validate.sh
-```
+## Development
 
-验证入口检查 Markdown 内部链接、Shell 脚本提交模式、YAML 语法和 Shell 语法。依赖说明见 [scripts/README.md](scripts/README.md)。
-
-## 维护边界
-
-日常采用本工作流时，不在本仓库为业务项目创建 Issue。只有修改 AgenticWonderwall 工作流本身时，才在本仓库记录维护任务。
-
-Agent 可以在已记录范围内实现、验证、push 和维护 Pull Request，但不得自行 merge 或 release。
-
-## 来源
-
-AgenticWonderwall 整理自
-[OasisSaber/agentic-project-workflow](https://github.com/OasisSaber/agentic-project-workflow)
-的最终接受基线。
-
-历史研发记录保留在旧仓库。
-
-基线提交：`ee0482d08ea6859bef2d1c06f37fa97bb25a575f`
+开发本仓库的编码 Agent 和贡献者参见 [`AGENTS.md`](AGENTS.md) 和 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
 ## License
 
