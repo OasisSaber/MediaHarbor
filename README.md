@@ -1,10 +1,8 @@
-# AgenticWonderwall
+# MediaHarbor
 
-A minimal single-Agent workflow for GitHub and Jujutsu.
+Media ingestion, acquisition, and orchestration platform.
 
-AgenticWonderwall 是面向个人开发者的单 Agent 工作流，是 GitHub Flow 与 Jujutsu 的轻量适配层，也是可复制的规则模板与稳定版本接口。
-
-它不是 Agent 服务、多 Agent 编排平台、Web 或 API 服务、CLI 产品、Agent 运行时、自动发布机器人或项目管理系统。
+MediaHarbor 面向个人开发者的媒体资源摄取、获取与编排平台，支持多后端路由、下载执行、状态管理与发布组装。
 
 ## 稳定接口
 
