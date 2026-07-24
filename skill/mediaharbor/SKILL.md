@@ -69,4 +69,4 @@ Structured status values:
 
 ## Current Phase
 
-This is the **multi-backend routing phase**. Basic workspace layout, tool indexing, root location, tool checking, ProcessRunner, yt-dlp adapter, ffprobe validator, static routing table, and multi-backend failover are implemented. Acquisition project workflow and release assembly will be added in subsequent iterations.
+This is the **acquisition workflow phase**. Basic workspace layout, tool indexing, root location, tool checking, ProcessRunner, yt-dlp adapter, ffprobe validator, static routing table, multi-backend failover, acquisition project management, task queue, coverage reports, and human editor handoff are implemented. Release assembly and end-to-end verification will be added next.
