@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import random
 import re
 import subprocess
 import time
 from dataclasses import dataclass, field
-from typing import Sequence
+from typing import Callable, Sequence
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 PROBE_TIMEOUT = 30
@@ -12,8 +13,12 @@ DOWNLOAD_TIMEOUT = 600
 MAX_RETRIES = 3
 MAX_TOTAL_ATTEMPTS = 6
 
+BACKOFF_BASE_DELAY = 2.0
+BACKOFF_MAX_DELAY = 60.0
+
 TOOL_STATUSES = {"READY", "DEGRADED", "MISSING"}
 SUCCESS = "SUCCESS"
+BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
 OP_STATUSES = {
     SUCCESS,
     "TOOL_MISSING",
@@ -28,6 +33,7 @@ OP_STATUSES = {
     "OS_ERROR",
     "INTERNAL_ERROR",
     "CONFIG_ERROR",
+    "BUDGET_EXHAUSTED",
 }
 
 RETRYABLE_STATUSES = {
@@ -75,6 +81,7 @@ class AttemptInfo:
     returncode: int
     elapsed: float
     retryable: bool
+    delay: float
     safe_error: str
 
 
@@ -118,9 +125,15 @@ def sanitize_stdout(stdout: str) -> str:
 
 
 class ProcessRunner:
-    def __init__(self, timeout: int = PROBE_TIMEOUT, max_retries: int = MAX_RETRIES):
+    def __init__(
+        self,
+        timeout: int = PROBE_TIMEOUT,
+        max_retries: int = MAX_RETRIES,
+        sleep_fn: Callable[[float], None] | None = None,
+    ):
         self.timeout = timeout
         self.max_retries = max_retries
+        self.sleep_fn = sleep_fn or time.sleep
 
     def run(
         self,
@@ -128,11 +141,25 @@ class ProcessRunner:
         check_drm: bool = True,
         backend: str | None = None,
         allow_system_path: bool = False,
+        attempt_limit: int | None = None,
     ) -> ProcessResult:
         attempts: list[AttemptInfo] = []
         last_result = ProcessResult(returncode=-1, stdout="", stderr="", status="INTERNAL_ERROR")
 
-        for attempt_num in range(1, self.max_retries + 1):
+        actual_max = (
+            min(self.max_retries, attempt_limit) if attempt_limit is not None else self.max_retries
+        )
+
+        for attempt_num in range(1, actual_max + 1):
+            if attempt_num > 1:
+                retry_count = attempt_num - 1
+                delay = min(BACKOFF_BASE_DELAY * (2 ** (retry_count - 1)), BACKOFF_MAX_DELAY)
+                jitter = random.uniform(0, delay * 0.5)
+                backoff = delay + jitter
+                self.sleep_fn(backoff)
+            else:
+                backoff = 0.0
+
             result = self._run_once(cmd, check_drm)
             result.stdout = sanitize_stdout(result.stdout)
             result.stderr = sanitize_stderr(result.stderr)
@@ -144,6 +171,7 @@ class ProcessRunner:
                 returncode=result.returncode,
                 elapsed=result.elapsed,
                 retryable=result.status in RETRYABLE_STATUSES,
+                delay=backoff,
                 safe_error=result.stderr[:200],
             )
             attempts.append(info)

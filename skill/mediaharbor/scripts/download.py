@@ -39,6 +39,7 @@ def main():
                     "n": a.attempt_number,
                     "status": a.status,
                     "retryable": a.retryable,
+                    "delay": round(a.delay, 2),
                     "error": a.safe_error,
                 }
                 for a in validated.attempts
