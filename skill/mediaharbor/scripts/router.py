@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from _common import find_project_root
-from process_runner import MAX_TOTAL_ATTEMPTS, ProcessResult, ProcessRunner
+from process_runner import BUDGET_EXHAUSTED, MAX_TOTAL_ATTEMPTS, ProcessResult, ProcessRunner
 
 ROUTING_TABLE_FILE = "routing.json"
 
@@ -234,18 +234,20 @@ def download_with_fallback(
     total_attempts = 0
 
     for backend_name in backends:
-        if total_attempts >= MAX_TOTAL_ATTEMPTS:
+        remaining = MAX_TOTAL_ATTEMPTS - total_attempts
+        if remaining <= 0:
             last_result = ProcessResult(
                 returncode=-1,
                 stdout="",
                 stderr="Total attempt limit exceeded",
-                status="RATE_LIMITED",
+                status=BUDGET_EXHAUSTED,
+                attempts=list(all_attempts),
             )
             break
         if runner is None:
             runner = ProcessRunner()
         saved_retries = runner.max_retries
-        runner.max_retries = route.max_retries
+        runner.max_retries = min(route.max_retries, remaining)
         result = execute_backend(backend_name, url, output_dir, runner=runner)
         runner.max_retries = saved_retries
         all_attempts.extend(result.attempts)

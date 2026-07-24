@@ -7,6 +7,7 @@ sys.path.insert(
     0, str(Path(__file__).resolve().parent.parent / "skill" / "mediaharbor" / "scripts")
 )
 from router import (
+    RouteEntry,
     _builtin_routes,
     download_with_fallback,
     execute_backend,
@@ -92,3 +93,121 @@ def test_bilibili_backends_order():
     route = match_route("https://www.bilibili.com/video/BV1xx", routes)
     assert route.backends[0] == "yt-dlp"
     assert route.backends[1] == "yutto"
+
+
+def test_global_budget_exhausted_across_backends(monkeypatch):
+    from process_runner import BUDGET_EXHAUSTED, AttemptInfo, ProcessResult, ProcessRunner
+
+    fake_attempts_pool = [
+        AttemptInfo(n, "fake", "DOWNLOAD_FAILED", 1, 0.1, True, 0.0, "fake") for n in range(1, 6)
+    ]
+    call_count = 0
+    last_runner_max = None
+
+    def fake_execute(backend_name, url, output_dir, runner=None):
+        nonlocal call_count, last_runner_max
+        call_count += 1
+        max_r = runner.max_retries if runner else 5
+        last_runner_max = max_r
+        return ProcessResult(
+            returncode=1,
+            stdout="",
+            stderr="fake fail",
+            status="DOWNLOAD_FAILED",
+            attempts=list(fake_attempts_pool[:max_r]),
+        )
+
+    monkeypatch.setattr("router.execute_backend", fake_execute)
+    monkeypatch.setattr("router.MAX_TOTAL_ATTEMPTS", 6)
+
+    route = RouteEntry(
+        name="test",
+        patterns=[".*"],
+        backends=["yt-dlp", "yutto", "gallery-dl"],
+        max_retries=5,
+    )
+    runner = ProcessRunner(max_retries=5, sleep_fn=lambda s: None)
+    result, last_backend = download_with_fallback(
+        "https://example.com/video",
+        Path("/tmp/out"),
+        routes=[route],
+        max_backends=3,
+        runner=runner,
+    )
+    assert result.status == BUDGET_EXHAUSTED
+    assert last_backend == "gallery-dl"
+    assert len(result.attempts) == 6
+    assert last_runner_max == 1
+
+
+def test_remaining_budget_one_caps_backend(monkeypatch):
+    from process_runner import AttemptInfo, ProcessResult, ProcessRunner
+
+    fake_attempts = [
+        AttemptInfo(n, "fake", "DOWNLOAD_FAILED", 1, 0.1, True, 0.0, "fake") for n in range(1, 6)
+    ]
+
+    def fake_execute(backend_name, url, output_dir, runner=None):
+        max_r = runner.max_retries
+        attempts = fake_attempts[:max_r]
+        return ProcessResult(
+            returncode=1,
+            stdout="",
+            stderr="fake fail",
+            status="DOWNLOAD_FAILED",
+            attempts=attempts,
+        )
+
+    monkeypatch.setattr("router.execute_backend", fake_execute)
+    monkeypatch.setattr("router.MAX_TOTAL_ATTEMPTS", 6)
+
+    route = RouteEntry(name="test", patterns=[".*"], backends=["yt-dlp", "yutto"], max_retries=5)
+    runner = ProcessRunner(max_retries=5, sleep_fn=lambda s: None)
+    result, last_backend = download_with_fallback(
+        "https://example.com/video",
+        Path("/tmp/out"),
+        routes=[route],
+        runner=runner,
+    )
+    assert len(result.attempts) == 6
+    assert last_backend == "yutto"
+    assert result.status == "DOWNLOAD_FAILED"
+
+
+def test_terminal_status_stops_fallback_immediately(monkeypatch):
+    from process_runner import AttemptInfo, ProcessResult, ProcessRunner
+
+    call_count = 0
+
+    def fake_execute(backend_name, url, output_dir, runner=None):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return ProcessResult(
+                returncode=1,
+                stdout="",
+                stderr="DRM detected",
+                status="DRM_DETECTED",
+                attempts=[AttemptInfo(1, backend_name, "DRM_DETECTED", 1, 0.1, False, 0.0, "DRM")],
+            )
+        return ProcessResult(
+            returncode=1,
+            stdout="",
+            stderr="fail",
+            status="DOWNLOAD_FAILED",
+            attempts=[AttemptInfo(1, backend_name, "DOWNLOAD_FAILED", 1, 0.1, True, 0.0, "fail")],
+        )
+
+    monkeypatch.setattr("router.execute_backend", fake_execute)
+
+    route = RouteEntry(name="test", patterns=[".*"], backends=["yt-dlp", "yutto"], max_retries=3)
+    runner = ProcessRunner(max_retries=3, sleep_fn=lambda s: None)
+    result, backend_name = download_with_fallback(
+        "https://example.com/video",
+        Path("/tmp/out"),
+        routes=[route],
+        runner=runner,
+    )
+    assert result.status == "DRM_DETECTED"
+    assert backend_name == "yt-dlp"
+    assert call_count == 1
