@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "routes": [
+    {
+      "name": "bilibili",
+      "patterns": ["bilibili\\.com", "b23\\.tv"],
+      "backends": ["yt-dlp", "yutto"],
+      "max_retries": 2,
+      "drm_stop": true
+    },
+    {
+      "name": "hls-dash",
+      "patterns": ["\\.m3u8($|\\?)", "\\.mpd($|\\?)"],
+      "backends": ["yt-dlp", "n-m3u8dl-re"],
+      "max_retries": 2,
+      "drm_stop": true
+    },
+    {
+      "name": "social",
+      "patterns": ["twitter\\.com/", "x\\.com/", "instagram\\.com/", "reddit\\.com/", "tumblr\\.com/", "pixiv\\.net/"],
+      "backends": ["gallery-dl", "yt-dlp"],
+      "max_retries": 2,
+      "drm_stop": true
+    },
+    {
+      "name": "vod",
+      "patterns": ["^https?://"],
+      "backends": ["yt-dlp"],
+      "max_retries": 2,
+      "drm_stop": true
+    }
+  ]
+}

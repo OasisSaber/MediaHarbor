@@ -69,4 +69,4 @@ Structured status values:
 
 ## Current Phase
 
-This is the **download execution phase**. Basic workspace layout, tool indexing, root location, tool checking, ProcessRunner, yt-dlp adapter, and ffprobe validator are implemented. Multi-backend routing, Bilibili/live/HLS protocols, and acquisition project workflow will be added in subsequent iterations. Do not claim complete multi-platform download ability at this stage.
+This is the **multi-backend routing phase**. Basic workspace layout, tool indexing, root location, tool checking, ProcessRunner, yt-dlp adapter, ffprobe validator, static routing table, and multi-backend failover are implemented. Acquisition project workflow and release assembly will be added in subsequent iterations.

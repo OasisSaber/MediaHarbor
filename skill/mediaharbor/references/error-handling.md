@@ -24,6 +24,7 @@
 | `VALIDATION_FAILED` | Post-download validation failed |
 | `OS_ERROR` | Operating system error |
 | `INTERNAL_ERROR` | Internal program error |
+| `CONFIG_ERROR` | Configuration file (routing.json, tools.json) is invalid |
 
 ## Retry Policy
 
