@@ -4,7 +4,8 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass, field
-from typing import Sequence
+from pathlib import Path
+from typing import Any, Sequence
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 PROBE_TIMEOUT = 30
@@ -86,6 +87,22 @@ class ProcessResult:
     elapsed: float = 0.0
     status: str = "INTERNAL_ERROR"
     attempts: list[AttemptInfo] = field(default_factory=list)
+
+
+@dataclass
+class BackendResult:
+    status: str
+    output_paths: list[Path] = field(default_factory=list)
+    stdout: str = ""
+    stderr: str = ""
+    attempts: list[AttemptInfo] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+def discover_output_files(output_dir: Path) -> list[Path]:
+    if not output_dir.is_dir():
+        return []
+    return sorted(f for f in output_dir.iterdir() if f.is_file())
 
 
 def sanitize_url(url: str) -> str:
