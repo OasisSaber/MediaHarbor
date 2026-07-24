@@ -8,7 +8,7 @@ from pathlib import Path
 from _common import ensure_output_dir
 from acquisition import complete_task, fail_task, get_pending_tasks, start_task
 from ffprobe_validator import get_media_info, parse_ffprobe_output, resolve_ffprobe
-from process_runner import SUCCESS, ProcessResult, ProcessRunner, sanitize_url
+from process_runner import SUCCESS, BackendResult, ProcessResult, ProcessRunner, sanitize_url
 from project import load_project
 from report import save_handoff, save_report
 from router import download_with_fallback
@@ -24,11 +24,26 @@ def _sha256(file_path: Path) -> str:
 
 
 def _generate_source_json(
-    project_name: str, url: str, file_path: Path, backend: str, attempts: list
+    project_name: str,
+    url: str,
+    result: BackendResult,
+    backend: str,
+    main_file: Path | None = None,
 ) -> Path | None:
     project = load_project(project_name)
     if project is None:
         return None
+
+    primary = main_file or (result.output_paths[0] if result.output_paths else None)
+    if primary is None:
+        return None
+
+    media_types = result.metadata.get("media_types", {})
+    local_files = media_types.get("main") or [str(p) for p in result.output_paths]
+    subtitles = media_types.get("subtitle", [])
+    thumbnails = media_types.get("thumbnail", [])
+    thumbnail = thumbnails[0] if thumbnails else None
+
     display_url = sanitize_url(url)
     entry = {
         "schema_version": 1,
@@ -44,32 +59,32 @@ def _generate_source_json(
         "duration": None,
         "selected_backend": backend,
         "attempt_history": [],
-        "local_files": [str(file_path)],
-        "subtitles": [],
-        "thumbnail": None,
+        "local_files": local_files,
+        "subtitles": subtitles,
+        "thumbnail": thumbnail,
         "sha256": None,
         "ffprobe_result": None,
         "acquisition_timestamp": datetime.now(timezone.utc).isoformat(),
         "rights_access_note": "Verify copyright before use.",
         "final_status": "SUCCESS",
     }
-    if attempts:
-        for a in attempts:
+    if result.attempts:
+        for a in result.attempts:
             entry["attempt_history"].append(
                 {
-                    "backend": a.get("backend"),
-                    "status": a.get("status"),
-                    "error": a.get("safe_error", "")[:200],
+                    "backend": a.backend,
+                    "status": a.status,
+                    "error": a.safe_error[:200],
                 }
             )
-    entry["sha256"] = _sha256(file_path)
+    entry["sha256"] = _sha256(primary)
     ffprobe = resolve_ffprobe()
-    if ffprobe and file_path.is_file():
+    if ffprobe and primary.is_file():
         from ffprobe_validator import validate_media
 
-        result = validate_media(file_path)
-        if result.status == SUCCESS:
-            info = parse_ffprobe_output(result.stdout)
+        p_result = validate_media(primary)
+        if p_result.status == SUCCESS:
+            info = parse_ffprobe_output(p_result.stdout)
             if info:
                 media = get_media_info(info)
                 entry["ffprobe_result"] = media
@@ -145,43 +160,65 @@ def process_pending(project_name: str, runner: ProcessRunner | None = None) -> d
         result, backend = download_with_fallback(task.url, output_dir, runner=runner)
         entry = {"url": task.url, "backend": backend, "status": result.status}
 
-        if result.status == SUCCESS and result.stdout.strip():
-            file_path = Path(result.stdout.strip().splitlines()[-1])
-            validation = _validate_downloaded_file(file_path, output_dir)
-            if validation.status == SUCCESS:
-                try:
-                    source_path = _generate_source_json(
-                        project_name,
-                        task.url,
-                        file_path,
-                        backend or "",
-                        [a.__dict__ for a in result.attempts],
-                    )
-                    if source_path is None:
-                        raise RuntimeError("Failed to generate source.json: project not found")
-                    source_data = json.loads(source_path.read_text(encoding="utf-8"))
-                    media = source_data.get("ffprobe_result") or {}
-                    complete_task(
-                        project_name,
-                        task.url,
-                        backend or "unknown",
-                        [str(file_path)],
-                        file_hash=source_data.get("sha256"),
-                        format=media.get("format_name"),
-                        duration=media.get("duration"),
-                        width=media.get("width"),
-                        height=media.get("height"),
-                    )
-                    results["success"] += 1
-                    entry["file"] = str(file_path)
-                except Exception as e:
-                    fail_task(project_name, task.url, f"source_json/complete: {e!s}")
-                    results["failed"] += 1
-                    entry["error"] = str(e)[:200]
-            else:
-                fail_task(project_name, task.url, f"Validation: {validation.stderr[:200]}")
+        if result.status == SUCCESS:
+            if not result.output_paths:
+                fail_task(
+                    project_name,
+                    task.url,
+                    "Backend reported SUCCESS but no output files were discovered",
+                )
                 results["failed"] += 1
-                entry["error"] = validation.stderr[:200]
+                entry["error"] = "VALIDATION_FAILED: no output files"
+                results["details"].append(entry)
+                continue
+
+            valid_file: Path | None = None
+            for fp in result.output_paths:
+                validation = _validate_downloaded_file(fp, output_dir)
+                if validation.status == SUCCESS:
+                    valid_file = fp
+                    break
+
+            if valid_file is None:
+                fail_task(
+                    project_name,
+                    task.url,
+                    "No valid media file found among discovered output paths",
+                )
+                results["failed"] += 1
+                entry["error"] = "VALIDATION_FAILED: no valid media"
+                results["details"].append(entry)
+                continue
+
+            try:
+                source_path = _generate_source_json(
+                    project_name,
+                    task.url,
+                    result,
+                    backend or "",
+                    main_file=valid_file,
+                )
+                if source_path is None:
+                    raise RuntimeError("Failed to generate source.json: project not found")
+                source_data = json.loads(source_path.read_text(encoding="utf-8"))
+                media = source_data.get("ffprobe_result") or {}
+                complete_task(
+                    project_name,
+                    task.url,
+                    backend or "unknown",
+                    [str(p) for p in result.output_paths],
+                    file_hash=source_data.get("sha256"),
+                    format=media.get("format_name"),
+                    duration=media.get("duration"),
+                    width=media.get("width"),
+                    height=media.get("height"),
+                )
+                results["success"] += 1
+                entry["file"] = str(valid_file)
+            except Exception as e:
+                fail_task(project_name, task.url, f"source_json/complete: {e!s}")
+                results["failed"] += 1
+                entry["error"] = str(e)[:200]
         else:
             fail_task(project_name, task.url, f"{result.status}: {result.stderr[:200]}")
             results["failed"] += 1

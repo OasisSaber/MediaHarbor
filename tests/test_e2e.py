@@ -49,6 +49,7 @@ def test_e2e_isolated_release_with_license_and_workflow():
             from _common import ensure_output_dir
             from acquisition import add_candidate, complete_task, start_task
             from orchestrator import _generate_source_json, _sha256
+            from process_runner import BackendResult
             from project import create_project, load_project, save_project
             from report import generate_coverage_report, generate_handoff
             from safe_path import resolve_project_dir
@@ -68,13 +69,18 @@ def test_e2e_isolated_release_with_license_and_workflow():
             file_hash = _sha256(fake_file)
             assert len(file_hash) == 64
 
-            # 5) Generate source.json
+            # 5) Generate source.json with BackendResult contract
+            be_result = BackendResult(
+                status="SUCCESS",
+                output_paths=[fake_file],
+                attempts=[],
+            )
             src_path = _generate_source_json(
                 "e2e-release-test",
                 "https://example.com/video?id=1",
-                fake_file,
+                be_result,
                 "yt-dlp",
-                [],
+                main_file=fake_file,
             )
             assert src_path is not None
             src_data = json.loads(src_path.read_text(encoding="utf-8"))

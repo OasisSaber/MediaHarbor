@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(
     0, str(Path(__file__).resolve().parent.parent / "skill" / "mediaharbor" / "scripts")
 )
+from process_runner import BackendResult
 from router import (
     _builtin_routes,
     download_with_fallback,
@@ -73,8 +74,8 @@ def test_no_match_unknown():
 
 
 def test_unknown_backend_returns_unsupported():
-
     result = execute_backend("nonexistent-backend", "https://example.com", Path("/tmp"))
+    assert isinstance(result, BackendResult)
     assert result.status == "UNSUPPORTED_URL"
 
 

@@ -7,6 +7,7 @@ from typing import Any
 from _common import find_project_root, resolve_registered_tool
 from process_runner import (
     SUCCESS,
+    BackendResult,
     ProcessResult,
     ProcessRunner,
     sanitize_url,
@@ -94,73 +95,71 @@ def parse_probe_json(output: str) -> dict[str, Any] | None:
         return None
 
 
+def _classify_output_files(paths: list[Path]) -> dict[str, Any]:
+    main: list[str] = []
+    subtitles: list[str] = []
+    thumbnails: list[str] = []
+    info_jsons: list[str] = []
+    for p in paths:
+        name = p.name.lower()
+        if name.endswith((".srt", ".vtt", ".ass", ".ssa", ".lrc")):
+            subtitles.append(str(p))
+        elif name.endswith((".jpg", ".jpeg", ".png", ".webp")):
+            thumbnails.append(str(p))
+        elif name.endswith(".info.json"):
+            info_jsons.append(str(p))
+        else:
+            main.append(str(p))
+    return {
+        "main": main,
+        "subtitle": subtitles,
+        "thumbnail": thumbnails,
+        "info_json": info_jsons,
+    }
+
+
+def _convert_to_backend_result(result: ProcessResult, output_dir: Path) -> BackendResult:
+    output_paths: list[Path] = []
+    if result.status == SUCCESS:
+        for line in result.stdout.strip().splitlines():
+            line = line.strip()
+            if line:
+                p = Path(line)
+                if p.is_file():
+                    output_paths.append(p)
+        if output_dir.is_dir():
+            for f in sorted(output_dir.iterdir()):
+                if f.is_file() and f not in output_paths:
+                    output_paths.append(f)
+    metadata = {"media_types": _classify_output_files(output_paths)} if output_paths else {}
+    return BackendResult(
+        status=result.status,
+        output_paths=output_paths,
+        stdout=result.stdout,
+        stderr=result.stderr,
+        attempts=result.attempts,
+        metadata=metadata,
+    )
+
+
 def download_url(
     url: str,
     output_dir: Path,
     runner: ProcessRunner | None = None,
     allow_system_path: bool = False,
-) -> ProcessResult:
+) -> BackendResult:
     if runner is None:
         runner = ProcessRunner(timeout=DOWNLOAD_TIMEOUT, max_retries=2)
     yt_path = resolve_ytdlp(allow_system_path=allow_system_path)
     if yt_path is None:
-        return ProcessResult(
-            returncode=-1, stdout="", stderr="yt-dlp not found", status="TOOL_MISSING"
+        return BackendResult(
+            status="TOOL_MISSING",
+            stderr="yt-dlp not found",
         )
     output_dir.mkdir(parents=True, exist_ok=True)
     cmd = [str(yt_path)] + build_download_args(url, output_dir)
     result = runner.run(cmd, check_drm=True, backend="yt-dlp")
-    return result
-
-
-def validate_download_result(result: ProcessResult, output_dir: Path) -> ProcessResult:
-    if result.status != SUCCESS:
-        return result
-
-    if not result.stdout.strip():
-        result.status = "VALIDATION_FAILED"
-        return result
-
-    downloaded_path = result.stdout.strip().splitlines()[-1].strip()
-    if not downloaded_path:
-        result.status = "VALIDATION_FAILED"
-        return result
-
-    file_path = Path(downloaded_path)
-    if not file_path.is_file() or file_path.stat().st_size == 0:
-        result.status = "VALIDATION_FAILED"
-        return result
-
-    try:
-        file_path.resolve().relative_to(output_dir.resolve())
-    except ValueError:
-        result.status = "VALIDATION_FAILED"
-        return result
-
-    from ffprobe_validator import parse_ffprobe_output, validate_media
-
-    probe_result = validate_media(file_path)
-    if probe_result.status != SUCCESS:
-        result.status = "VALIDATION_FAILED"
-        return result
-
-    info = parse_ffprobe_output(probe_result.stdout)
-    if not info:
-        result.status = "VALIDATION_FAILED"
-        return result
-
-    from ffprobe_validator import get_media_info
-
-    media = get_media_info(info)
-    if media["duration"] <= 0:
-        result.status = "VALIDATION_FAILED"
-        return result
-    has_video = any(s.get("codec_type") == "video" for s in info.get("streams", []))
-    if not has_video:
-        result.status = "VALIDATION_FAILED"
-        return result
-
-    return result
+    return _convert_to_backend_result(result, output_dir)
 
 
 DOWNLOAD_TIMEOUT = 600

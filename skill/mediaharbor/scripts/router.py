@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from _common import find_project_root
-from process_runner import MAX_TOTAL_ATTEMPTS, ProcessResult, ProcessRunner
+from process_runner import MAX_TOTAL_ATTEMPTS, BackendResult, ProcessRunner
 
 ROUTING_TABLE_FILE = "routing.json"
 
@@ -160,7 +160,7 @@ def execute_backend(
     url: str,
     output_dir: Path,
     runner: ProcessRunner | None = None,
-) -> ProcessResult:
+) -> BackendResult:
     if runner is None:
         runner = ProcessRunner()
     if backend_name == "yt-dlp":
@@ -183,11 +183,9 @@ def execute_backend(
         from backends.gallery_dl import run_gallery_dl
 
         return run_gallery_dl(url, output_dir, runner=runner)
-    return ProcessResult(
-        returncode=-1,
-        stdout="",
-        stderr=f"Unknown backend: {backend_name}",
+    return BackendResult(
         status="UNSUPPORTED_URL",
+        stderr=f"Unknown backend: {backend_name}",
     )
 
 
@@ -197,17 +195,15 @@ def download_with_fallback(
     routes: list[RouteEntry] | None = None,
     max_backends: int = 3,
     runner: ProcessRunner | None = None,
-) -> tuple[ProcessResult, str | None]:
+) -> tuple[BackendResult, str | None]:
     if routes is None:
         try:
             routes = load_routing_table(safe_fallback=False)
         except ValueError:
             return (
-                ProcessResult(
-                    returncode=-1,
-                    stdout="",
-                    stderr="routing.json not found or invalid",
+                BackendResult(
                     status="CONFIG_ERROR",
+                    stderr="routing.json not found or invalid",
                 ),
                 None,
             )
@@ -215,11 +211,9 @@ def download_with_fallback(
     route = match_route(url, routes)
     if route is None:
         return (
-            ProcessResult(
-                returncode=-1,
-                stdout="",
-                stderr=f"No route for: {url}",
+            BackendResult(
                 status="UNSUPPORTED_URL",
+                stderr=f"No route for: {url}",
             ),
             None,
         )
@@ -235,11 +229,9 @@ def download_with_fallback(
 
     for backend_name in backends:
         if total_attempts >= MAX_TOTAL_ATTEMPTS:
-            last_result = ProcessResult(
-                returncode=-1,
-                stdout="",
-                stderr="Total attempt limit exceeded",
+            last_result = BackendResult(
                 status="RATE_LIMITED",
+                stderr="Total attempt limit exceeded",
             )
             break
         if runner is None:
