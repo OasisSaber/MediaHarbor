@@ -8,19 +8,7 @@ from process_runner import ProcessResult, ProcessRunner
 
 
 def resolve_ffprobe(allow_system_path: bool = False) -> Path | None:
-    try:
-        result = resolve_registered_tool("ffprobe", allow_system_path=allow_system_path)
-        if result:
-            return result
-    except Exception:
-        pass
-    if allow_system_path:
-        import shutil
-
-        system = shutil.which("ffprobe")
-        if system:
-            return Path(system)
-    return None
+    return resolve_registered_tool("ffprobe", allow_system_path=allow_system_path)
 
 
 def validate_media(file_path: Path, runner: ProcessRunner | None = None) -> ProcessResult:

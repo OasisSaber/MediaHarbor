@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import platform as _platform
 import re
 import shutil
 from dataclasses import dataclass, field
@@ -12,7 +13,22 @@ SKILL_FILE = "skill/mediaharbor/SKILL.md"
 TOOLS_JSON_REL = "download-tools/tools.json"
 TOOLS_FILE = "tools.json"
 SUPPORTED_SCHEMA_VERSION = 1
-PREFERRED_PLATFORM = "windows-x64"
+
+
+def detect_platform() -> str:
+    system = _platform.system()
+    machine = _platform.machine().lower()
+    if system == "Windows":
+        return "windows-x64"
+    if system == "Linux":
+        if machine in ("x86_64", "amd64"):
+            return "linux-x64"
+        raise RuntimeError(f"Unsupported CPU architecture for Linux: {machine}")
+    if system == "Darwin":
+        if machine in ("arm64", "aarch64"):
+            return "macos-arm64"
+        raise RuntimeError(f"Unsupported CPU architecture for macOS: {machine}")
+    raise RuntimeError(f"Unsupported operating system: {system}")
 
 
 @dataclass
@@ -20,10 +36,15 @@ class ToolEntry:
     roles: list[str]
     required: bool = False
     platforms: dict[str, str] = field(default_factory=dict)
+    system_name: str | None = None
 
     @property
     def path(self) -> str:
-        return self.platforms.get(PREFERRED_PLATFORM, "")
+        try:
+            key = detect_platform()
+            return self.platforms.get(key, "")
+        except RuntimeError:
+            return ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ToolEntry:
@@ -34,6 +55,7 @@ class ToolEntry:
             roles=data.get("roles", []),
             required=data.get("required", False),
             platforms=platforms,
+            system_name=data.get("system_name"),
         )
 
 
@@ -50,12 +72,14 @@ class ToolStatus:
     exists: bool
     roles: list[str]
     required: bool
+    source: str = ""
 
 
 @dataclass
 class CheckResult:
     status: str
     tools: dict[str, ToolStatus] = field(default_factory=dict)
+    platform: str = ""
 
 
 def find_project_root(start: Path | None = None) -> Path:
@@ -182,32 +206,59 @@ def resolve_registered_tool(
     if resolved.is_file():
         return resolved
     if allow_system_path:
-        sys = shutil.which(name)
-        if sys:
-            return Path(sys)
+        binary = getattr(entry, "system_name", None) or name
+        sys_path = shutil.which(binary)
+        if sys_path:
+            return Path(sys_path)
     return None
 
 
 resolve_tool = resolve_registered_tool
 
 
-def check_tools(registry: ToolRegistry | None = None) -> CheckResult:
+def check_tools(
+    registry: ToolRegistry | None = None,
+    allow_system_path: bool = False,
+) -> CheckResult:
+    platform_key = ""
+    try:
+        platform_key = detect_platform()
+    except RuntimeError:
+        pass
     if registry is None:
-        registry = load_registry()
+        try:
+            registry = load_registry()
+        except Exception:
+            return CheckResult(status="ERROR", platform=platform_key)
     root = find_project_root()
-    result = CheckResult(status="READY")
+    result = CheckResult(status="READY", platform=platform_key)
     for name, entry in registry.tools.items():
         raw = entry.path
-        exists = (root / "download-tools" / raw).is_file() if raw else False
+        path_exists = False
+        source = ""
+        resolved_path = raw
+        if raw:
+            candidate = root / "download-tools" / raw
+            path_exists = candidate.is_file()
+            if path_exists:
+                source = "registered"
+        if not path_exists and allow_system_path:
+            binary = getattr(entry, "system_name", None) or name
+            sys_path = shutil.which(binary)
+            if sys_path:
+                path_exists = True
+                source = "system_path"
+                resolved_path = sys_path
         status = ToolStatus(
             name=name,
-            path=raw,
-            exists=exists,
+            path=resolved_path,
+            exists=path_exists,
             roles=entry.roles,
             required=entry.required,
+            source=source,
         )
         result.tools[name] = status
-        if entry.required and not exists:
+        if entry.required and not path_exists:
             result.status = "DEGRADED"
     return result
 

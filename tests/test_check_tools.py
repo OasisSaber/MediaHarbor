@@ -36,7 +36,12 @@ def test_check_tools_json_output():
     data = json.loads(result.stdout)
     assert "status" in data
     assert data["status"] in ("READY", "DEGRADED", "ERROR")
+    assert "platform" in data
+    assert data["platform"] in ("windows-x64", "linux-x64", "macos-arm64")
     assert "tools" in data
+    for tname, tdata in data["tools"].items():
+        assert "source" in tdata
+        assert tdata["source"] in ("registered", "", "system_path")
 
 
 def test_missing_required_tools_returns_degraded():
@@ -147,6 +152,87 @@ def test_fake_executable_is_recognized():
         assert data["tools"]["my-tool"]["exists"] is True
 
 
+def test_allow_system_path_detects_system_tool():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        _setup_temp_root(root)
+        (root / "download-tools" / "tools.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "tools": {
+                        "python": {
+                            "platforms": {"windows-x64": "nonexistent/python.exe"},
+                            "roles": ["test"],
+                            "required": False,
+                        },
+                    },
+                }
+            )
+        )
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(root / "skill" / "mediaharbor" / "scripts" / "check_tools.py"),
+                "--json",
+                "--allow-system-path",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=root,
+        )
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        data = json.loads(result.stdout)
+        assert "python" in data["tools"]
+        python_data = data["tools"]["python"]
+        assert python_data["exists"] is True
+        assert python_data["source"] == "system_path"
+
+
+def test_allow_system_path_does_not_affect_registered_tool():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        _setup_temp_root(root)
+        tool_dir = root / "download-tools" / "mytool"
+        tool_dir.mkdir(parents=True)
+        fake_exe = tool_dir / "mytool.exe"
+        fake_exe.write_text("fake")
+        orig_path = "mytool/mytool.exe"
+
+        (root / "download-tools" / "tools.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "tools": {
+                        "mytool": {
+                            "platforms": {"windows-x64": orig_path},
+                            "roles": ["test"],
+                            "required": True,
+                        },
+                    },
+                }
+            )
+        )
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(root / "skill" / "mediaharbor" / "scripts" / "check_tools.py"),
+                "--json",
+                "--allow-system-path",
+            ],
+            capture_output=True,
+            text=True,
+            cwd=root,
+        )
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        data = json.loads(result.stdout)
+        mytool = data["tools"]["mytool"]
+        assert mytool["exists"] is True
+        assert mytool["source"] == "registered"
+
+
 def test_output_dir_created_on_demand():
     with tempfile.TemporaryDirectory() as tmp:
         rt = Path(tmp)
@@ -195,3 +281,4 @@ def test_json_output_is_parseable():
     assert result.returncode == 0
     data = json.loads(result.stdout)
     assert isinstance(data, dict)
+    assert "platform" in data

@@ -50,6 +50,7 @@
     "n-m3u8dl-re": {
       "roles": ["hls", "dash", "mss"],
       "required": false,
+      "system_name": "N_m3u8DL-RE",
       "platforms": {
         "windows-x64": "N_m3u8DL-RE/N_m3u8DL-RE.exe",
         "linux-x64": "N_m3u8DL-RE/N_m3u8DL-RE",
