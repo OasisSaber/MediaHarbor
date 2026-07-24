@@ -14,19 +14,7 @@ from process_runner import (
 
 
 def resolve_ytdlp(allow_system_path: bool = False) -> Path | None:
-    try:
-        result = resolve_registered_tool("yt-dlp", allow_system_path=allow_system_path)
-        if result:
-            return result
-    except Exception:
-        pass
-    if allow_system_path:
-        import shutil
-
-        system = shutil.which("yt-dlp")
-        if system:
-            return Path(system)
-    return None
+    return resolve_registered_tool("yt-dlp", allow_system_path=allow_system_path)
 
 
 def build_probe_args(url: str) -> list[str]:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
 from _common import resolve_registered_tool
@@ -8,17 +7,7 @@ from process_runner import ProcessResult, ProcessRunner
 
 
 def resolve_streamlink(allow_system_path: bool = False) -> Path | None:
-    try:
-        result = resolve_registered_tool("streamlink", allow_system_path=allow_system_path)
-        if result:
-            return result
-    except Exception:
-        pass
-    if allow_system_path:
-        system = shutil.which("streamlink")
-        if system:
-            return Path(system)
-    return None
+    return resolve_registered_tool("streamlink", allow_system_path=allow_system_path)
 
 
 def run_streamlink(
