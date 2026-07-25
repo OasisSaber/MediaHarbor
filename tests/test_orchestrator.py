@@ -158,3 +158,251 @@ def test_process_pending_streamlink_success():
                 assert str(fake_file) in proj.tasks[0].output_paths
         finally:
             os.chdir(cwd)
+
+
+def test_process_pending_download_exception_fails_task_and_continues():
+    from unittest.mock import patch
+
+    from _common import ensure_output_dir
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, AttemptInfo, BackendResult, ProcessResult
+    from project import create_project, load_project, save_project
+    from safe_path import resolve_project_dir
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("dl-exc-test")
+            save_project(p)
+
+            root = ensure_output_dir()
+            pdir = resolve_project_dir(root, "dl-exc-test")
+            asset_dir = pdir / "assets" / "originals"
+            asset_dir.mkdir(parents=True, exist_ok=True)
+            fake_b = asset_dir / "b.ts"
+            fake_b.write_text("dummy")
+
+            add_candidate("dl-exc-test", "https://example.com/a")
+            add_candidate("dl-exc-test", "https://example.com/b")
+
+            ok = BackendResult(
+                status=SUCCESS,
+                output_paths=[fake_b],
+                attempts=[AttemptInfo(1, "yt-dlp", SUCCESS, 0, 1.0, False, "")],
+            )
+            with (
+                patch(
+                    "orchestrator.download_with_fallback",
+                    side_effect=[RuntimeError("download boom"), (ok, "yt-dlp")],
+                ),
+                patch(
+                    "orchestrator._validate_downloaded_file",
+                    return_value=ProcessResult(0, "validated", "", status=SUCCESS),
+                ),
+            ):
+                results = process_pending("dl-exc-test")
+
+            assert results["failed"] == 1
+            assert results["success"] == 1
+            proj = load_project("dl-exc-test")
+            a = next(t for t in proj.tasks if t.url == "https://example.com/a")
+            b = next(t for t in proj.tasks if t.url == "https://example.com/b")
+            assert a.status == "FAILED"
+            assert b.status == "COMPLETED"
+        finally:
+            os.chdir(cwd)
+
+
+def test_process_pending_validation_exception_fails_task():
+    from unittest.mock import patch
+
+    from _common import ensure_output_dir
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult
+    from project import create_project, load_project, save_project
+    from safe_path import resolve_project_dir
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("val-exc-test")
+            save_project(p)
+
+            root = ensure_output_dir()
+            pdir = resolve_project_dir(root, "val-exc-test")
+            asset_dir = pdir / "assets" / "originals"
+            asset_dir.mkdir(parents=True, exist_ok=True)
+            fake = asset_dir / "v.ts"
+            fake.write_text("dummy")
+
+            add_candidate("val-exc-test", "https://example.com/v")
+            be = BackendResult(status=SUCCESS, output_paths=[fake])
+            with (
+                patch("orchestrator.download_with_fallback", return_value=(be, "yt-dlp")),
+                patch(
+                    "orchestrator._validate_downloaded_file",
+                    side_effect=RuntimeError("probe parse boom"),
+                ),
+            ):
+                results = process_pending("val-exc-test")
+
+            assert results["failed"] == 1
+            assert results["success"] == 0
+            proj = load_project("val-exc-test")
+            assert proj.tasks[0].status == "FAILED"
+        finally:
+            os.chdir(cwd)
+
+
+def test_source_json_not_finalized_when_complete_fails():
+    from unittest.mock import patch
+
+    from _common import ensure_output_dir
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult, ProcessResult
+    from project import create_project, load_project, save_project
+    from safe_path import resolve_project_dir
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("commit-unit-test")
+            save_project(p)
+
+            root = ensure_output_dir()
+            pdir = resolve_project_dir(root, "commit-unit-test")
+            asset_dir = pdir / "assets" / "originals"
+            asset_dir.mkdir(parents=True, exist_ok=True)
+            fake = asset_dir / "c.ts"
+            fake.write_text("dummy")
+
+            add_candidate("commit-unit-test", "https://example.com/c")
+            be = BackendResult(status=SUCCESS, output_paths=[fake])
+            with (
+                patch("orchestrator.download_with_fallback", return_value=(be, "yt-dlp")),
+                patch(
+                    "orchestrator._validate_downloaded_file",
+                    return_value=ProcessResult(0, "validated", "", status=SUCCESS),
+                ),
+                patch("orchestrator.complete_task", side_effect=RuntimeError("persist boom")),
+            ):
+                results = process_pending("commit-unit-test")
+
+            assert results["failed"] == 1
+            assert results["success"] == 0
+            proj = load_project("commit-unit-test")
+            assert proj.tasks[0].status == "FAILED"
+
+            sources_dir = pdir / "acquisition" / "sources"
+            finalized = list(sources_dir.glob("*.json")) if sources_dir.is_dir() else []
+            pending = list(sources_dir.glob("*.json.pending")) if sources_dir.is_dir() else []
+            assert finalized == []
+            assert pending == []
+        finally:
+            os.chdir(cwd)
+
+
+def test_process_pending_recovers_orphaned_running():
+    from unittest.mock import patch
+
+    from _common import ensure_output_dir
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, AttemptInfo, BackendResult, ProcessResult
+    from project import DownloadTask, create_project, load_project, save_project
+    from safe_path import resolve_project_dir
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("orphan-test")
+            p.tasks.append(DownloadTask(url="https://example.com/o", status="RUNNING"))
+            save_project(p)
+
+            root = ensure_output_dir()
+            pdir = resolve_project_dir(root, "orphan-test")
+            asset_dir = pdir / "assets" / "originals"
+            asset_dir.mkdir(parents=True, exist_ok=True)
+            fake = asset_dir / "o.ts"
+            fake.write_text("dummy")
+
+            be = BackendResult(
+                status=SUCCESS,
+                output_paths=[fake],
+                attempts=[AttemptInfo(1, "yt-dlp", SUCCESS, 0, 1.0, False, "")],
+            )
+            with (
+                patch("orchestrator.download_with_fallback", return_value=(be, "yt-dlp")),
+                patch(
+                    "orchestrator._validate_downloaded_file",
+                    return_value=ProcessResult(0, "validated", "", status=SUCCESS),
+                ),
+            ):
+                results = process_pending("orphan-test")
+
+            assert results["success"] == 1
+            proj = load_project("orphan-test")
+            assert proj.tasks[0].status == "COMPLETED"
+        finally:
+            os.chdir(cwd)
+
+
+def test_finalize_source_json_failure_reverts_task_to_failed():
+    from unittest.mock import patch
+
+    from _common import ensure_output_dir
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult, ProcessResult
+    from project import create_project, load_project, save_project
+    from safe_path import resolve_project_dir
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("finalize-fail-test")
+            save_project(p)
+
+            root = ensure_output_dir()
+            pdir = resolve_project_dir(root, "finalize-fail-test")
+            asset_dir = pdir / "assets" / "originals"
+            asset_dir.mkdir(parents=True, exist_ok=True)
+            fake = asset_dir / "f.ts"
+            fake.write_text("dummy")
+
+            add_candidate("finalize-fail-test", "https://example.com/f")
+            be = BackendResult(status=SUCCESS, output_paths=[fake])
+            with (
+                patch("orchestrator.download_with_fallback", return_value=(be, "yt-dlp")),
+                patch(
+                    "orchestrator._validate_downloaded_file",
+                    return_value=ProcessResult(0, "validated", "", status=SUCCESS),
+                ),
+                patch("orchestrator._finalize_source_json", return_value=None),
+            ):
+                results = process_pending("finalize-fail-test")
+
+            assert results["failed"] == 1
+            assert results["success"] == 0
+            proj = load_project("finalize-fail-test")
+            assert proj.tasks[0].status == "FAILED"
+
+            sources_dir = pdir / "acquisition" / "sources"
+            finalized = list(sources_dir.glob("*.json")) if sources_dir.is_dir() else []
+            pending = list(sources_dir.glob("*.json.pending")) if sources_dir.is_dir() else []
+            assert finalized == []
+            assert pending == []
+        finally:
+            os.chdir(cwd)

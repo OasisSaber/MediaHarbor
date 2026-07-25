@@ -16,7 +16,7 @@ SCHEMA_VERSION = 1
 VALID_STATUSES = {"PENDING", "RUNNING", "COMPLETED", "FAILED", "SKIPPED"}
 ALLOWED_TRANSITIONS = {
     "PENDING": {"RUNNING", "SKIPPED"},
-    "RUNNING": {"COMPLETED", "FAILED"},
+    "RUNNING": {"COMPLETED", "FAILED", "PENDING"},
     "FAILED": {"PENDING"},
     "COMPLETED": set(),
     "SKIPPED": {"PENDING"},
@@ -107,17 +107,37 @@ def _init_project_dirs(name: str) -> Path:
     return pdir
 
 
-def _atomic_write(path: Path, content: str):
-    tmp = path.with_suffix(path.suffix + ".tmp")
+def _safe_unlink(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        pass
+
+
+def _atomic_write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    bak = path.with_suffix(path.suffix + ".bak")
     tmp.write_text(content, encoding="utf-8")
-    if path.exists():
-        bak = path.with_suffix(path.suffix + ".bak")
+    main_existed = path.is_file()
+    if main_existed:
         try:
             os.replace(path, bak)
         except OSError:
-            pass
-    os.replace(tmp, path)
+            _safe_unlink(tmp)
+            raise
+    try:
+        os.replace(tmp, path)
+    except OSError:
+        if main_existed:
+            try:
+                os.replace(bak, path)
+            except OSError:
+                pass
+        _safe_unlink(tmp)
+        raise
 
 
 def save_project(project: Project) -> Path:
@@ -130,20 +150,42 @@ def save_project(project: Project) -> Path:
     return path
 
 
-def load_project(name: str) -> Project | None:
-    pdir = project_dir(name)
-    path = pdir / "project.json"
+def _read_project_json(path: Path) -> dict[str, Any] | None:
     if not path.is_file():
         return None
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def load_project(name: str) -> Project | None:
+    pdir = project_dir(name)
+    path = pdir / "project.json"
+    data = _read_project_json(path)
+    if data is None:
         bak = path.with_suffix(path.suffix + ".bak")
-        if bak.is_file():
-            data = json.loads(bak.read_text(encoding="utf-8"))
-        else:
-            return None
+        data = _read_project_json(bak)
+    if data is None:
+        return None
     return _project_from_dict(data)
+
+
+def recover_stale_running(project_name: str) -> int:
+    project = load_project(project_name)
+    if project is None:
+        return 0
+    count = 0
+    for task in project.tasks:
+        if task.status == "RUNNING":
+            _validate_transition(task.status, "PENDING", task.task_id)
+            task.status = "PENDING"
+            task.started_at = None
+            task.error = None
+            count += 1
+    if count:
+        save_project(project)
+    return count
 
 
 def _validate_transition(current: str, next_state: str, task_id: str):

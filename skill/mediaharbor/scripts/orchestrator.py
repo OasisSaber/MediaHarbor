@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from _common import ensure_output_dir
 from acquisition import complete_task, fail_task, get_pending_tasks, start_task
 from ffprobe_validator import get_media_info, parse_ffprobe_output, resolve_ffprobe
 from process_runner import SUCCESS, BackendResult, ProcessResult, ProcessRunner, sanitize_url
-from project import load_project
+from project import load_project, recover_stale_running, save_project
 from report import save_handoff, save_report
 from router import download_with_fallback
 from safe_path import resolve_project_dir
@@ -93,9 +94,57 @@ def _generate_source_json(
     root = ensure_output_dir()
     pdir = resolve_project_dir(root, project_name) / "acquisition" / "sources"
     pdir.mkdir(parents=True, exist_ok=True)
-    spath = pdir / f"{entry['source_id']}.json"
+    spath = pdir / f"{entry['source_id']}.json.pending"
     spath.write_text(json.dumps(entry, indent=2, ensure_ascii=False), encoding="utf-8")
     return spath
+
+
+def _finalize_source_json(pending: Path) -> Path | None:
+    final = pending.with_suffix(".json")
+    try:
+        os.replace(pending, final)
+        return final
+    except OSError:
+        return None
+
+
+def _discard_source_json(pending: Path | None) -> None:
+    if pending is None:
+        return
+    try:
+        pending.unlink()
+    except (FileNotFoundError, OSError):
+        pass
+
+
+def _cleanup_stale_pending_sources(project_name: str) -> None:
+    root = ensure_output_dir()
+    pdir = resolve_project_dir(root, project_name) / "acquisition" / "sources"
+    if not pdir.is_dir():
+        return
+    for f in pdir.glob("*.json.pending"):
+        try:
+            f.unlink()
+        except OSError:
+            pass
+
+
+def _force_fail(project_name: str, url: str, error: str) -> None:
+    try:
+        fail_task(project_name, url, error)
+        return
+    except Exception:
+        pass
+    project = load_project(project_name)
+    if project is None:
+        return
+    now = datetime.now(timezone.utc).isoformat()
+    for task in project.tasks:
+        if task.url == url and task.status not in {"COMPLETED", "FAILED", "SKIPPED"}:
+            task.status = "FAILED"
+            task.error = error[:200]
+            task.completed_at = now
+    save_project(project)
 
 
 def _validate_downloaded_file(file_path: Path, output_dir: Path) -> ProcessResult:
@@ -134,6 +183,8 @@ def _validate_downloaded_file(file_path: Path, output_dir: Path) -> ProcessResul
 def process_pending(project_name: str, runner: ProcessRunner | None = None) -> dict:
     if runner is None:
         runner = ProcessRunner(timeout=600, max_retries=2)
+    recover_stale_running(project_name)
+    _cleanup_stale_pending_sources(project_name)
     pending = get_pending_tasks(project_name)
     results = {"processed": 0, "success": 0, "failed": 0, "details": []}
 
@@ -152,24 +203,33 @@ def process_pending(project_name: str, runner: ProcessRunner | None = None) -> d
         if started is None:
             continue
         results["processed"] += 1
+        entry: dict = {"url": task.url, "backend": None, "status": "INTERNAL_ERROR"}
+        pending_source: Path | None = None
+        finalized_source: Path | None = None
 
-        root = ensure_output_dir()
-        output_dir = resolve_project_dir(root, project_name) / "assets" / "originals"
-        output_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            root = ensure_output_dir()
+            output_dir = resolve_project_dir(root, project_name) / "assets" / "originals"
+            output_dir.mkdir(parents=True, exist_ok=True)
 
-        result, backend = download_with_fallback(task.url, output_dir, runner=runner)
-        entry = {"url": task.url, "backend": backend, "status": result.status}
+            result, backend = download_with_fallback(task.url, output_dir, runner=runner)
+            entry["backend"] = backend
+            entry["status"] = result.status
 
-        if result.status == SUCCESS:
+            if result.status != SUCCESS:
+                _force_fail(project_name, task.url, f"{result.status}: {result.stderr[:200]}")
+                results["failed"] += 1
+                entry["error"] = result.stderr[:200]
+                continue
+
             if not result.output_paths:
-                fail_task(
+                _force_fail(
                     project_name,
                     task.url,
                     "Backend reported SUCCESS but no output files were discovered",
                 )
                 results["failed"] += 1
                 entry["error"] = "VALIDATION_FAILED: no output files"
-                results["details"].append(entry)
                 continue
 
             valid_file: Path | None = None
@@ -180,50 +240,54 @@ def process_pending(project_name: str, runner: ProcessRunner | None = None) -> d
                     break
 
             if valid_file is None:
-                fail_task(
+                _force_fail(
                     project_name,
                     task.url,
                     "No valid media file found among discovered output paths",
                 )
                 results["failed"] += 1
                 entry["error"] = "VALIDATION_FAILED: no valid media"
-                results["details"].append(entry)
                 continue
 
-            try:
-                source_path = _generate_source_json(
-                    project_name,
-                    task.url,
-                    result,
-                    backend or "",
-                    main_file=valid_file,
-                )
-                if source_path is None:
-                    raise RuntimeError("Failed to generate source.json: project not found")
-                source_data = json.loads(source_path.read_text(encoding="utf-8"))
-                media = source_data.get("ffprobe_result") or {}
-                complete_task(
-                    project_name,
-                    task.url,
-                    backend or "unknown",
-                    [str(p) for p in result.output_paths],
-                    file_hash=source_data.get("sha256"),
-                    format=media.get("format_name"),
-                    duration=media.get("duration"),
-                    width=media.get("width"),
-                    height=media.get("height"),
-                )
-                results["success"] += 1
-                entry["file"] = str(valid_file)
-            except Exception as e:
-                fail_task(project_name, task.url, f"source_json/complete: {e!s}")
-                results["failed"] += 1
-                entry["error"] = str(e)[:200]
-        else:
-            fail_task(project_name, task.url, f"{result.status}: {result.stderr[:200]}")
+            pending_source = _generate_source_json(
+                project_name,
+                task.url,
+                result,
+                backend or "",
+                main_file=valid_file,
+            )
+            if pending_source is None:
+                raise RuntimeError("Failed to generate source.json: project not found")
+            source_data = json.loads(pending_source.read_text(encoding="utf-8"))
+            media = source_data.get("ffprobe_result") or {}
+            finalized_source = _finalize_source_json(pending_source)
+            if finalized_source is None:
+                raise RuntimeError("source.json finalize failed")
+            pending_source = None
+            complete_task(
+                project_name,
+                task.url,
+                backend or "unknown",
+                [str(p) for p in result.output_paths],
+                file_hash=source_data.get("sha256"),
+                format=media.get("format_name"),
+                duration=media.get("duration"),
+                width=media.get("width"),
+                height=media.get("height"),
+            )
+            finalized_source = None
+            results["success"] += 1
+            entry["file"] = str(valid_file)
+        except Exception as e:
+            _discard_source_json(pending_source)
+            pending_source = None
+            _discard_source_json(finalized_source)
+            finalized_source = None
+            _force_fail(project_name, task.url, f"unhandled: {e!s}")
             results["failed"] += 1
-            entry["error"] = result.stderr[:200]
-        results["details"].append(entry)
+            entry["error"] = str(e)[:200]
+        finally:
+            results["details"].append(entry)
 
     save_report(project_name)
     save_handoff(project_name)
