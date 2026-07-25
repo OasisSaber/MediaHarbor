@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from _common import ensure_output_dir
-from acquisition import complete_task, fail_task, get_pending_tasks, start_task
+from acquisition import complete_task, fail_task, get_pending_tasks, skip_task, start_task
 from ffprobe_validator import get_media_info, parse_ffprobe_output, resolve_ffprobe
 from process_runner import SUCCESS, ProcessResult, ProcessRunner, sanitize_url
 from project import load_project
@@ -124,11 +124,7 @@ def process_pending(project_name: str, runner: ProcessRunner | None = None) -> d
 
     for task in pending:
         if "REDACTED" in task.url:
-            fail_task(
-                project_name,
-                task.url,
-                "Cannot download: URL was sanitized (REDACTED). Raw URL must be re-provided.",
-            )
+            skip_task(project_name, task.url)
             results["failed"] += 1
             results["details"].append({"url": task.url, "error": "URL sanitized"})
             continue

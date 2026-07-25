@@ -33,8 +33,11 @@ jobs:
       - name: Ruff lint check
         run: python -m ruff check .
 
-      - name: Pytest
-        run: python -m pytest -v
+      - name: Pytest (unit)
+        run: python -m pytest -v --ignore=tests/test_orchestrator_integration.py
+
+      - name: Pytest (orchestration integration)
+        run: python -m pytest -v tests/test_orchestrator_integration.py
 
       - name: Smoke test locate_root
         run: python skill/mediaharbor/scripts/locate_root.py --json
@@ -63,8 +66,11 @@ jobs:
       - name: Ruff lint check
         run: python -m ruff check .
 
-      - name: Pytest
-        run: python -m pytest -v
+      - name: Pytest (unit)
+        run: python -m pytest -v --ignore=tests/test_orchestrator_integration.py
+
+      - name: Pytest (orchestration integration)
+        run: python -m pytest -v tests/test_orchestrator_integration.py
 
       - name: Smoke test locate_root
         run: python skill/mediaharbor/scripts/locate_root.py --json
