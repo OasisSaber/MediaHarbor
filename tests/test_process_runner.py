@@ -107,3 +107,14 @@ def test_attempts_recorded():
     for a in result.attempts:
         assert a.attempt_number >= 1
         assert a.status in ("RATE_LIMITED",)
+
+
+def test_discover_output_files_in_nested_backend_directory(tmp_path):
+    from process_runner import discover_output_files, snapshot_output_files
+
+    before = snapshot_output_files(tmp_path)
+    nested = tmp_path / "site" / "author" / "video.mp4"
+    nested.parent.mkdir(parents=True)
+    nested.write_text("media")
+
+    assert discover_output_files(tmp_path, before) == [nested]

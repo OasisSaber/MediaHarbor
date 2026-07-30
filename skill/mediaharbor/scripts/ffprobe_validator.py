@@ -44,6 +44,34 @@ def validate_media(file_path: Path, runner: ProcessRunner | None = None) -> Proc
     return runner.run(cmd, backend="ffprobe")
 
 
+def validate_downloaded_file(file_path: Path, output_dir: Path) -> ProcessResult:
+    if not file_path.is_file() or file_path.stat().st_size == 0:
+        return ProcessResult(
+            returncode=-1,
+            stdout="",
+            stderr="File missing or empty",
+            status="VALIDATION_FAILED",
+        )
+    try:
+        file_path.resolve().relative_to(output_dir.resolve())
+    except ValueError:
+        return ProcessResult(
+            returncode=-1,
+            stdout="",
+            stderr="File outside output dir",
+            status="VALIDATION_FAILED",
+        )
+
+    result = validate_media(file_path)
+    if result.status != "SUCCESS":
+        return result
+    info = parse_ffprobe_output(result.stdout)
+    media = get_media_info(info) if info else None
+    if not media or media["duration"] <= 0 or not media["has_video"]:
+        result.status = "VALIDATION_FAILED"
+    return result
+
+
 def parse_ffprobe_output(stdout: str) -> dict | None:
     if not stdout.strip():
         return None

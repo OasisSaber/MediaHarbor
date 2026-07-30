@@ -4,13 +4,15 @@ import re
 import subprocess
 import time
 from dataclasses import dataclass, field
-from typing import Sequence
+from pathlib import Path
+from typing import Any, Sequence
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 PROBE_TIMEOUT = 30
 DOWNLOAD_TIMEOUT = 600
 MAX_RETRIES = 3
 MAX_TOTAL_ATTEMPTS = 6
+MAX_BACKEND_STDERR = 2000
 
 TOOL_STATUSES = {"READY", "DEGRADED", "MISSING"}
 SUCCESS = "SUCCESS"
@@ -86,6 +88,82 @@ class ProcessResult:
     elapsed: float = 0.0
     status: str = "INTERNAL_ERROR"
     attempts: list[AttemptInfo] = field(default_factory=list)
+
+
+@dataclass
+class BackendResult:
+    status: str
+    output_paths: list[Path] = field(default_factory=list)
+    stdout: str = ""
+    stderr: str = ""
+    attempts: list[AttemptInfo] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self):
+        self.stderr = sanitize_stderr(self.stderr)[:MAX_BACKEND_STDERR]
+        if self.output_paths and "media_types" not in self.metadata:
+            self.metadata["media_types"] = classify_output_files(self.output_paths)
+
+    @classmethod
+    def from_process(
+        cls,
+        result: ProcessResult,
+        output_paths: list[Path],
+    ) -> BackendResult:
+        status = result.status
+        stderr = result.stderr
+        if status == SUCCESS and not output_paths:
+            status = "VALIDATION_FAILED"
+            stderr = "Backend reported success but produced no output files"
+        return cls(
+            status=status,
+            output_paths=output_paths,
+            stdout=result.stdout,
+            stderr=stderr,
+            attempts=result.attempts,
+        )
+
+
+def classify_output_files(paths: list[Path]) -> dict[str, list[str]]:
+    media_types: dict[str, list[str]] = {
+        "main": [],
+        "subtitle": [],
+        "thumbnail": [],
+        "info_json": [],
+    }
+    for path in paths:
+        name = path.name.lower()
+        if name.endswith((".srt", ".vtt", ".ass", ".ssa", ".lrc")):
+            media_types["subtitle"].append(str(path))
+        elif name.endswith((".jpg", ".jpeg", ".png", ".webp")):
+            media_types["thumbnail"].append(str(path))
+        elif name.endswith((".info.json", ".nfo")):
+            media_types["info_json"].append(str(path))
+        else:
+            media_types["main"].append(str(path))
+    return media_types
+
+
+def snapshot_output_files(output_dir: Path) -> dict[Path, tuple[int, int]]:
+    if not output_dir.is_dir():
+        return {}
+    return {
+        path: (path.stat().st_mtime_ns, path.stat().st_size)
+        for path in output_dir.rglob("*")
+        if path.is_file()
+    }
+
+
+def discover_output_files(
+    output_dir: Path,
+    before: dict[Path, tuple[int, int]] | None = None,
+) -> list[Path]:
+    if not output_dir.is_dir():
+        return []
+    current = snapshot_output_files(output_dir)
+    if before is None:
+        return sorted(current)
+    return sorted(path for path, fingerprint in current.items() if before.get(path) != fingerprint)
 
 
 def sanitize_url(url: str) -> str:

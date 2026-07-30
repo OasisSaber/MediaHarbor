@@ -107,6 +107,28 @@ def test_complete_task_empty_paths():
             os.chdir(cwd)
 
 
+def test_complete_task_is_idempotent_for_material_registration():
+    from acquisition import add_candidate, complete_task, start_task
+    from project import create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            save_project(create_project("idempotent-task"))
+            url = "https://example.com/video"
+            add_candidate("idempotent-task", url)
+            start_task("idempotent-task", url)
+
+            complete_task("idempotent-task", url, "yt-dlp", ["video.mp4"])
+            complete_task("idempotent-task", url, "yt-dlp", ["video.mp4"])
+
+            assert len(load_project("idempotent-task").materials) == 1
+        finally:
+            os.chdir(cwd)
+
+
 def test_fail_task():
     from acquisition import add_candidate, fail_task, start_task
     from project import create_project, save_project

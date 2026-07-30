@@ -63,6 +63,8 @@ def complete_task(
     url: str,
     backend: str,
     output_paths: list[str],
+    material_paths: list[str] | None = None,
+    material_hashes: dict[str, str] | None = None,
     file_hash: str | None = None,
     format: str | None = None,
     duration: float | None = None,
@@ -89,11 +91,11 @@ def complete_task(
     if not found:
         return None
     display_url = sanitize_url(url)
-    for path in output_paths:
+    for path in material_paths if material_paths is not None else output_paths:
         material = MaterialInfo(
             source_url=display_url,
             local_path=path,
-            file_hash=file_hash,
+            file_hash=(material_hashes or {}).get(path, file_hash),
             format=format,
             duration=duration,
             width=width,

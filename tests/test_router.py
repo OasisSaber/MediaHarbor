@@ -6,7 +6,9 @@ from pathlib import Path
 sys.path.insert(
     0, str(Path(__file__).resolve().parent.parent / "skill" / "mediaharbor" / "scripts")
 )
+from process_runner import BackendResult
 from router import (
+    RouteEntry,
     _builtin_routes,
     download_with_fallback,
     execute_backend,
@@ -73,8 +75,8 @@ def test_no_match_unknown():
 
 
 def test_unknown_backend_returns_unsupported():
-
     result = execute_backend("nonexistent-backend", "https://example.com", Path("/tmp"))
+    assert isinstance(result, BackendResult)
     assert result.status == "UNSUPPORTED_URL"
 
 
@@ -92,3 +94,42 @@ def test_bilibili_backends_order():
     route = match_route("https://www.bilibili.com/video/BV1xx", routes)
     assert route.backends[0] == "yt-dlp"
     assert route.backends[1] == "yutto"
+
+
+def test_fallback_backends_use_isolated_attempt_directories(tmp_path, monkeypatch):
+    import router
+
+    route = RouteEntry(
+        name="isolated-fallback",
+        patterns=[r"example\.com"],
+        backends=["yt-dlp", "streamlink"],
+        max_retries=1,
+    )
+    attempt_dirs = []
+
+    def fake_execute(backend_name, _url, output_dir, runner=None):
+        del runner
+        attempt_dirs.append(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if backend_name == "yt-dlp":
+            (output_dir / "partial.mp4").write_text("partial")
+            return BackendResult(status="DOWNLOAD_FAILED")
+        completed = output_dir / "stream.ts"
+        completed.write_text("complete")
+        return BackendResult(status="SUCCESS", output_paths=[completed])
+
+    monkeypatch.setattr(router, "execute_backend", fake_execute)
+    monkeypatch.setattr(router, "probe_and_resolve_live", lambda *_args, **_kwargs: (None, None))
+
+    result, backend = download_with_fallback(
+        "https://example.com/live",
+        tmp_path,
+        routes=[route],
+    )
+
+    assert result.status == "SUCCESS"
+    assert backend == "streamlink"
+    assert len(attempt_dirs) == 2
+    assert attempt_dirs[0] != attempt_dirs[1]
+    assert all(path.parent == tmp_path for path in attempt_dirs)
+    assert result.output_paths == [attempt_dirs[1] / "stream.ts"]
