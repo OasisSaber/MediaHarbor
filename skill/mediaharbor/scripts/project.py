@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -109,15 +110,24 @@ def _init_project_dirs(name: str) -> Path:
 
 def _atomic_write(path: Path, content: str):
     tmp = path.with_suffix(path.suffix + ".tmp")
+    bak = path.with_suffix(path.suffix + ".bak")
+    bak_tmp = path.with_suffix(path.suffix + ".bak.tmp")
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp.write_text(content, encoding="utf-8")
-    if path.exists():
-        bak = path.with_suffix(path.suffix + ".bak")
-        try:
-            os.replace(path, bak)
-        except OSError:
-            pass
-    os.replace(tmp, path)
+    try:
+        with tmp.open("w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if path.is_file():
+            shutil.copy2(path, bak_tmp)
+            os.replace(bak_tmp, bak)
+        os.replace(tmp, path)
+    finally:
+        for temporary in (tmp, bak_tmp):
+            try:
+                temporary.unlink()
+            except FileNotFoundError:
+                pass
 
 
 def save_project(project: Project) -> Path:
@@ -133,17 +143,39 @@ def save_project(project: Project) -> Path:
 def load_project(name: str) -> Project | None:
     pdir = project_dir(name)
     path = pdir / "project.json"
+    project = _load_project_file(path)
+    if project is not None:
+        return project
+
+    bak = path.with_suffix(path.suffix + ".bak")
+    project = _load_project_file(bak)
+    if project is None:
+        return None
+
+    restore_tmp = path.with_suffix(path.suffix + ".restore.tmp")
+    try:
+        shutil.copy2(bak, restore_tmp)
+        os.replace(restore_tmp, path)
+    except OSError:
+        pass
+    finally:
+        try:
+            restore_tmp.unlink()
+        except FileNotFoundError:
+            pass
+    return project
+
+
+def _load_project_file(path: Path) -> Project | None:
     if not path.is_file():
         return None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        bak = path.with_suffix(path.suffix + ".bak")
-        if bak.is_file():
-            data = json.loads(bak.read_text(encoding="utf-8"))
-        else:
+        if not isinstance(data, dict):
             return None
-    return _project_from_dict(data)
+        return _project_from_dict(data)
+    except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+        return None
 
 
 def _validate_transition(current: str, next_state: str, task_id: str):

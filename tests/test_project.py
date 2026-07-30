@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 import tempfile
@@ -75,5 +76,88 @@ def test_project_with_story_nodes():
             assert loaded is not None
             assert len(loaded.story_nodes) == 1
             assert loaded.story_nodes[0].title == "Opening Scene"
+        finally:
+            os.chdir(cwd)
+
+
+def test_failed_primary_replace_preserves_last_valid_project():
+    from unittest.mock import patch
+
+    import project as project_module
+    from project import create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project = create_project("replace-failure", "version one")
+            save_project(project)
+            project.script = "version two"
+            real_replace = project_module.os.replace
+            replace_calls = 0
+
+            def fail_second_replace(source, destination):
+                nonlocal replace_calls
+                replace_calls += 1
+                if replace_calls == 2:
+                    raise OSError("injected primary replace failure")
+                return real_replace(source, destination)
+
+            with patch("project.os.replace", side_effect=fail_second_replace):
+                try:
+                    save_project(project)
+                except OSError:
+                    pass
+
+            loaded = load_project("replace-failure")
+            assert loaded is not None
+            assert loaded.script == "version one"
+        finally:
+            os.chdir(cwd)
+
+
+def test_missing_primary_is_restored_from_backup():
+    from project import create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project = create_project("backup-recovery", "version one")
+            path = save_project(project)
+            project.script = "version two"
+            save_project(project)
+            path.unlink()
+
+            loaded = load_project("backup-recovery")
+
+            assert loaded is not None
+            assert loaded.script == "version one"
+            assert path.is_file()
+        finally:
+            os.chdir(cwd)
+
+
+def test_corrupt_primary_is_restored_from_backup():
+    from project import create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project = create_project("corrupt-recovery", "version one")
+            path = save_project(project)
+            project.script = "version two"
+            save_project(project)
+            path.write_text("{corrupt", encoding="utf-8")
+
+            loaded = load_project("corrupt-recovery")
+
+            assert loaded is not None
+            assert loaded.script == "version one"
+            assert json.loads(path.read_text(encoding="utf-8"))["script"] == "version one"
         finally:
             os.chdir(cwd)

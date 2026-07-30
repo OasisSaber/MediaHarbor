@@ -156,3 +156,22 @@ def get_pending_tasks(project_name: str) -> list[DownloadTask]:
     if project is None:
         return []
     return [t for t in project.tasks if t.status == "PENDING"]
+
+
+def recover_interrupted_tasks(project_name: str) -> int:
+    project = load_project(project_name)
+    if project is None:
+        return 0
+    recovered = 0
+    completed_at = datetime.now(timezone.utc).isoformat()
+    for task in project.tasks:
+        if task.status != "RUNNING":
+            continue
+        _validate_transition(task.status, "FAILED", task.task_id)
+        task.status = "FAILED"
+        task.error = "Interrupted before task completion"
+        task.completed_at = completed_at
+        recovered += 1
+    if recovered:
+        save_project(project)
+    return recovered
