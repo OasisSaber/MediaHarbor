@@ -7,15 +7,28 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from _common import ensure_output_dir
-from acquisition import complete_task, fail_task, get_pending_tasks, start_task
+from acquisition import (
+    complete_task,
+    fail_task,
+    get_pending_tasks,
+    recover_interrupted_tasks,
+    start_task,
+)
 from ffprobe_validator import (
     get_media_info,
     parse_ffprobe_output,
     resolve_ffprobe,
     validate_downloaded_file,
 )
-from process_runner import SUCCESS, BackendResult, ProcessResult, ProcessRunner, sanitize_url
-from project import load_project
+from process_runner import (
+    SUCCESS,
+    BackendResult,
+    ProcessResult,
+    ProcessRunner,
+    sanitize_stderr,
+    sanitize_url,
+)
+from project import DownloadTask, _atomic_write, load_project
 from report import save_handoff, save_report
 from router import download_with_fallback
 from safe_path import resolve_project_dir
@@ -29,13 +42,13 @@ def _sha256(file_path: Path) -> str:
     return h.hexdigest()
 
 
-def _generate_source_json(
+def _build_source_entry(
     project_name: str,
     url: str,
     result: BackendResult,
     backend: str,
     main_file: Path | None = None,
-) -> Path | None:
+) -> dict | None:
     project = load_project(project_name)
     if project is None:
         return None
@@ -96,12 +109,117 @@ def _generate_source_json(
                 entry["ffprobe_result"] = media
                 entry["duration"] = media.get("duration")
 
+    return entry
+
+
+def _source_dir(project_name: str) -> Path:
     root = ensure_output_dir()
-    pdir = resolve_project_dir(root, project_name) / "acquisition" / "sources"
-    pdir.mkdir(parents=True, exist_ok=True)
-    spath = pdir / f"{entry['source_id']}.json"
-    spath.write_text(json.dumps(entry, indent=2, ensure_ascii=False), encoding="utf-8")
-    return spath
+    path = resolve_project_dir(root, project_name) / "acquisition" / "sources"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _write_source_entry(project_name: str, entry: dict) -> Path:
+    path = _source_dir(project_name) / f"{entry['source_id']}.json"
+    _atomic_write(path, json.dumps(entry, indent=2, ensure_ascii=False))
+    return path
+
+
+def _generate_source_json(
+    project_name: str,
+    url: str,
+    result: BackendResult,
+    backend: str,
+    main_file: Path | None = None,
+) -> Path | None:
+    entry = _build_source_entry(project_name, url, result, backend, main_file)
+    if entry is None:
+        return None
+    return _write_source_entry(project_name, entry)
+
+
+def _stage_source_transaction(
+    project_name: str,
+    task_id: str,
+    entry: dict,
+    artifacts: list[Path],
+) -> Path:
+    pending = _source_dir(project_name) / f"{task_id}.source.pending"
+    transaction = {
+        "task_id": task_id,
+        "target": f"{entry['source_id']}.json",
+        "artifacts": [str(path) for path in artifacts],
+        "source": entry,
+    }
+    _atomic_write(pending, json.dumps(transaction, indent=2, ensure_ascii=False))
+    return pending
+
+
+def _read_source_transaction(pending: Path) -> dict:
+    transaction = json.loads(pending.read_text(encoding="utf-8"))
+    target = transaction.get("target")
+    if (
+        not isinstance(target, str)
+        or Path(target).name != target
+        or not target.endswith(".json")
+        or not isinstance(transaction.get("source"), dict)
+    ):
+        raise ValueError("Invalid source transaction")
+    return transaction
+
+
+def _remove_pending_file(pending: Path) -> None:
+    pending.unlink(missing_ok=True)
+    pending.with_suffix(pending.suffix + ".bak").unlink(missing_ok=True)
+    pending.with_suffix(pending.suffix + ".tmp").unlink(missing_ok=True)
+
+
+def _commit_source_transaction(pending: Path) -> Path:
+    transaction = _read_source_transaction(pending)
+    target = pending.parent / transaction["target"]
+    _atomic_write(
+        target,
+        json.dumps(transaction["source"], indent=2, ensure_ascii=False),
+    )
+    _remove_pending_file(pending)
+    return target
+
+
+def _remove_transaction_artifacts(project_name: str, transaction: dict) -> None:
+    root = ensure_output_dir()
+    originals = (resolve_project_dir(root, project_name) / "assets" / "originals").resolve()
+    for raw_path in transaction.get("artifacts", []):
+        try:
+            artifact = Path(raw_path).resolve()
+            artifact.relative_to(originals)
+            artifact.unlink(missing_ok=True)
+        except (OSError, TypeError, ValueError):
+            continue
+
+
+def _recover_source_transactions(project_name: str) -> int:
+    project = load_project(project_name)
+    if project is None:
+        return 0
+    tasks = {task.task_id: task for task in project.tasks}
+    recovered = 0
+    for pending in _source_dir(project_name).glob("*.source.pending"):
+        try:
+            transaction = _read_source_transaction(pending)
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+            _remove_pending_file(pending)
+            continue
+        task = tasks.get(transaction.get("task_id"))
+        if task is not None and task.status == "COMPLETED":
+            try:
+                _commit_source_transaction(pending)
+                recovered += 1
+            except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+                continue
+        else:
+            _remove_transaction_artifacts(project_name, transaction)
+            _remove_pending_file(pending)
+    return recovered
 
 
 def _validate_downloaded_file(file_path: Path, output_dir: Path) -> ProcessResult:
@@ -156,122 +274,179 @@ def _finalize_artifacts(
     return result, main_paths
 
 
+def _fail_started_task(
+    project_name: str,
+    url: str,
+    entry: dict,
+    error: str,
+) -> tuple[bool, dict]:
+    safe_error = sanitize_stderr(error)[:200]
+    fail_task(project_name, url, safe_error)
+    entry["error"] = safe_error
+    return False, entry
+
+
+def _process_started_task(
+    project_name: str,
+    task: DownloadTask,
+    runner: ProcessRunner,
+) -> tuple[bool, dict]:
+    root = ensure_output_dir()
+    project_dir = resolve_project_dir(root, project_name)
+    final_dir = project_dir / "assets" / "originals"
+    staging_dir = _prepare_task_staging(project_dir, task.task_id)
+    finalized_paths: list[Path] = []
+    source_pending: Path | None = None
+    project_committed = False
+
+    try:
+        result, backend = download_with_fallback(task.url, staging_dir, runner=runner)
+        entry = {"url": task.url, "backend": backend, "status": result.status}
+        if result.status != SUCCESS:
+            return _fail_started_task(
+                project_name,
+                task.url,
+                entry,
+                f"{result.status}: {result.stderr}",
+            )
+        if not result.output_paths:
+            return _fail_started_task(
+                project_name,
+                task.url,
+                entry,
+                "VALIDATION_FAILED: no output files",
+            )
+
+        media_types = result.metadata.get("media_types", {})
+        main_candidates = [Path(path) for path in media_types.get("main", [])] or list(
+            result.output_paths
+        )
+        validations: list[ProcessResult] = []
+        for file_path in main_candidates:
+            validation = _validate_downloaded_file(file_path, staging_dir)
+            if validation.status != SUCCESS:
+                break
+            validations.append(validation)
+        if len(validations) != len(main_candidates):
+            return _fail_started_task(
+                project_name,
+                task.url,
+                entry,
+                "VALIDATION_FAILED: invalid media",
+            )
+
+        result, finalized_main = _finalize_artifacts(
+            result,
+            staging_dir,
+            final_dir,
+            task.task_id,
+        )
+        finalized_paths = list(result.output_paths)
+        valid_file = finalized_main[0]
+        source_entry = _build_source_entry(
+            project_name,
+            task.url,
+            result,
+            backend or "",
+            main_file=valid_file,
+        )
+        if source_entry is None:
+            raise RuntimeError("Failed to generate source.json: project not found")
+        source_pending = _stage_source_transaction(
+            project_name,
+            task.task_id,
+            source_entry,
+            finalized_paths,
+        )
+        media = source_entry.get("ffprobe_result") or {}
+        media_fields = (
+            {
+                "format": media.get("format_name"),
+                "duration": media.get("duration"),
+                "width": media.get("width"),
+                "height": media.get("height"),
+            }
+            if len(finalized_main) == 1
+            else {}
+        )
+        completed = complete_task(
+            project_name,
+            task.url,
+            backend or "unknown",
+            [str(path) for path in result.output_paths],
+            material_paths=[str(path) for path in finalized_main],
+            material_hashes={str(path): _sha256(path) for path in finalized_main},
+            **media_fields,
+        )
+        if completed is None:
+            raise RuntimeError("Failed to complete task: project or task not found")
+        project_committed = True
+        try:
+            _commit_source_transaction(source_pending)
+        except OSError:
+            entry["source_pending"] = True
+        entry["file"] = str(valid_file)
+        return True, entry
+    except Exception:
+        if not project_committed:
+            if source_pending is not None:
+                _remove_pending_file(source_pending)
+            for path in finalized_paths:
+                path.unlink(missing_ok=True)
+        raise
+    finally:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+
+
 def process_pending(project_name: str, runner: ProcessRunner | None = None) -> dict:
     if runner is None:
         runner = ProcessRunner(timeout=600, max_retries=2)
+    source_transactions_recovered = _recover_source_transactions(project_name)
+    recovered = recover_interrupted_tasks(project_name)
     pending = get_pending_tasks(project_name)
-    results = {"processed": 0, "success": 0, "failed": 0, "details": []}
+    results = {
+        "processed": 0,
+        "success": 0,
+        "failed": 0,
+        "recovered": recovered,
+        "source_transactions_recovered": source_transactions_recovered,
+        "details": [],
+    }
 
     for task in pending:
         if "REDACTED" in task.url:
-            fail_task(
+            started = start_task(project_name, task.url)
+            if started is None:
+                continue
+            results["processed"] += 1
+            _, entry = _fail_started_task(
                 project_name,
                 task.url,
-                "Cannot download: URL was sanitized (REDACTED). Raw URL must be re-provided.",
+                {"url": task.url, "backend": None, "status": "VALIDATION_FAILED"},
+                "Cannot download a sanitized URL without its raw runtime value",
             )
             results["failed"] += 1
-            results["details"].append({"url": task.url, "error": "URL sanitized"})
+            results["details"].append(entry)
             continue
 
         started = start_task(project_name, task.url)
         if started is None:
             continue
         results["processed"] += 1
-
-        root = ensure_output_dir()
-        project_dir = resolve_project_dir(root, project_name)
-        final_dir = project_dir / "assets" / "originals"
-        staging_dir = _prepare_task_staging(project_dir, task.task_id)
-
-        result, backend = download_with_fallback(task.url, staging_dir, runner=runner)
-        entry = {"url": task.url, "backend": backend, "status": result.status}
-
-        if result.status == SUCCESS:
-            if not result.output_paths:
-                fail_task(
-                    project_name,
-                    task.url,
-                    "Backend reported SUCCESS but no output files were discovered",
-                )
-                results["failed"] += 1
-                entry["error"] = "VALIDATION_FAILED: no output files"
-                results["details"].append(entry)
-                shutil.rmtree(staging_dir, ignore_errors=True)
-                continue
-
-            media_types = result.metadata.get("media_types", {})
-            main_candidates = [Path(path) for path in media_types.get("main", [])] or list(
-                result.output_paths
-            )
-            validations: list[ProcessResult] = []
-            for fp in main_candidates:
-                validation = _validate_downloaded_file(fp, staging_dir)
-                if validation.status != SUCCESS:
-                    break
-                validations.append(validation)
-
-            if len(validations) != len(main_candidates):
-                fail_task(
-                    project_name,
-                    task.url,
-                    "At least one discovered media file failed validation",
-                )
-                results["failed"] += 1
-                entry["error"] = "VALIDATION_FAILED: invalid media"
-                results["details"].append(entry)
-                shutil.rmtree(staging_dir, ignore_errors=True)
-                continue
-
-            try:
-                result, finalized_main = _finalize_artifacts(
-                    result,
-                    staging_dir,
-                    final_dir,
-                    task.task_id,
-                )
-                valid_file = finalized_main[0]
-                source_path = _generate_source_json(
-                    project_name,
-                    task.url,
-                    result,
-                    backend or "",
-                    main_file=valid_file,
-                )
-                if source_path is None:
-                    raise RuntimeError("Failed to generate source.json: project not found")
-                source_data = json.loads(source_path.read_text(encoding="utf-8"))
-                media = source_data.get("ffprobe_result") or {}
-                media_fields = (
-                    {
-                        "format": media.get("format_name"),
-                        "duration": media.get("duration"),
-                        "width": media.get("width"),
-                        "height": media.get("height"),
-                    }
-                    if len(finalized_main) == 1
-                    else {}
-                )
-                complete_task(
-                    project_name,
-                    task.url,
-                    backend or "unknown",
-                    [str(p) for p in result.output_paths],
-                    material_paths=[str(p) for p in finalized_main],
-                    material_hashes={str(path): _sha256(path) for path in finalized_main},
-                    **media_fields,
-                )
-                results["success"] += 1
-                entry["file"] = str(valid_file)
-            except Exception as e:
-                fail_task(project_name, task.url, f"source_json/complete: {e!s}")
-                results["failed"] += 1
-                entry["error"] = str(e)[:200]
-        else:
-            fail_task(project_name, task.url, f"{result.status}: {result.stderr[:200]}")
-            results["failed"] += 1
-            entry["error"] = result.stderr[:200]
+        try:
+            succeeded, entry = _process_started_task(project_name, started, runner)
+        except Exception as error:
+            safe_error = sanitize_stderr(f"{type(error).__name__}: {error}")[:200]
+            fail_task(project_name, task.url, f"INTERNAL_ERROR: {safe_error}")
+            succeeded = False
+            entry = {
+                "url": task.url,
+                "backend": None,
+                "status": "INTERNAL_ERROR",
+                "error": safe_error,
+            }
+        results["success" if succeeded else "failed"] += 1
         results["details"].append(entry)
-        shutil.rmtree(staging_dir, ignore_errors=True)
 
     save_report(project_name)
     save_handoff(project_name)

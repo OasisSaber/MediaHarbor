@@ -348,3 +348,253 @@ def test_consecutive_streamlink_tasks_keep_distinct_artifacts():
             }
         finally:
             os.chdir(cwd)
+
+
+def test_validation_exception_fails_one_task_and_continues_queue():
+    from unittest.mock import patch
+
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult, ProcessResult
+    from project import create_project, load_project, project_dir, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"queue-exception-{Path(tmp).name}"
+            save_project(create_project(project_name))
+            first_url = "https://example.com/first"
+            second_url = "https://example.com/second"
+            add_candidate(project_name, first_url)
+            add_candidate(project_name, second_url)
+
+            def fake_download(url, output_dir, runner=None):
+                del runner
+                media = output_dir / "video.mp4"
+                media.write_text(url)
+                return BackendResult(status=SUCCESS, output_paths=[media]), "yt-dlp"
+
+            validation_success = ProcessResult(
+                returncode=0,
+                stdout="validated",
+                stderr="",
+                status=SUCCESS,
+            )
+            with (
+                patch("orchestrator.download_with_fallback", side_effect=fake_download),
+                patch(
+                    "orchestrator._validate_downloaded_file",
+                    side_effect=[ValueError("malformed ffprobe fields"), validation_success],
+                ),
+            ):
+                result = process_pending(project_name)
+
+            assert result["processed"] == 2
+            assert result["failed"] == 1
+            assert result["success"] == 1
+            project = load_project(project_name)
+            statuses = {task.url: task.status for task in project.tasks}
+            assert statuses == {
+                first_url: "FAILED",
+                second_url: "COMPLETED",
+            }
+            assert all(task.status != "RUNNING" for task in project.tasks)
+            source_files = list(
+                (project_dir(project_name) / "acquisition" / "sources").glob("*.json")
+            )
+            assert len(source_files) == 1
+            source = json.loads(source_files[0].read_text(encoding="utf-8"))
+            assert source["display_url"] == second_url
+            assert source["final_status"] == "SUCCESS"
+        finally:
+            os.chdir(cwd)
+
+
+def test_process_pending_recovers_interrupted_running_task():
+    from acquisition import add_candidate, start_task
+    from orchestrator import process_pending
+    from project import create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"interrupted-{Path(tmp).name}"
+            url = "https://example.com/interrupted"
+            save_project(create_project(project_name))
+            add_candidate(project_name, url)
+            start_task(project_name, url)
+            assert load_project(project_name).tasks[0].status == "RUNNING"
+
+            result = process_pending(project_name)
+
+            task = load_project(project_name).tasks[0]
+            assert result["recovered"] == 1
+            assert task.status == "FAILED"
+            assert "interrupted" in task.error.lower()
+            assert task.completed_at is not None
+        finally:
+            os.chdir(cwd)
+
+
+def test_project_commit_failure_leaves_no_success_source_or_final_artifact():
+    from unittest.mock import patch
+
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult, ProcessResult
+    from project import create_project, load_project, project_dir, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"commit-failure-{Path(tmp).name}"
+            url = "https://example.com/commit-failure"
+            save_project(create_project(project_name))
+            add_candidate(project_name, url)
+            task_id = load_project(project_name).tasks[0].task_id
+
+            def fake_download(_url, output_dir, runner=None):
+                del runner
+                media = output_dir / "video.mp4"
+                media.write_text("media")
+                return BackendResult(status=SUCCESS, output_paths=[media]), "yt-dlp"
+
+            with (
+                patch("orchestrator.download_with_fallback", side_effect=fake_download),
+                patch("orchestrator._validate_downloaded_file") as validation,
+                patch(
+                    "orchestrator.complete_task",
+                    side_effect=OSError("injected project commit failure"),
+                ),
+            ):
+                validation.return_value = ProcessResult(
+                    returncode=0,
+                    stdout="validated",
+                    stderr="",
+                    status=SUCCESS,
+                )
+                result = process_pending(project_name)
+
+            project = load_project(project_name)
+            assert result["failed"] == 1
+            assert project.tasks[0].status == "FAILED"
+            assert project.materials == []
+            source_dir = project_dir(project_name) / "acquisition" / "sources"
+            assert list(source_dir.glob("*.json")) == []
+            final_dir = project_dir(project_name) / "assets" / "originals"
+            assert list(final_dir.glob(f"{task_id}-*")) == []
+        finally:
+            os.chdir(cwd)
+
+
+def test_completed_task_recovers_pending_source_transaction():
+    from acquisition import add_candidate, complete_task, start_task
+    from orchestrator import _stage_source_transaction, process_pending
+    from project import create_project, load_project, project_dir, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"source-recovery-{Path(tmp).name}"
+            url = "https://example.com/recover-source"
+            save_project(create_project(project_name))
+            add_candidate(project_name, url)
+            task = start_task(project_name, url)
+            artifact = project_dir(project_name) / "assets" / "originals" / "video.mp4"
+            artifact.write_text("media")
+            entry = {
+                "source_id": f"source-{task.task_id}",
+                "display_url": url,
+                "final_status": "SUCCESS",
+            }
+            pending = _stage_source_transaction(
+                project_name,
+                task.task_id,
+                entry,
+                [artifact],
+            )
+            complete_task(project_name, url, "yt-dlp", [str(artifact)])
+
+            result = process_pending(project_name)
+
+            source = pending.parent / f"{entry['source_id']}.json"
+            assert result["source_transactions_recovered"] == 1
+            assert source.is_file()
+            assert json.loads(source.read_text(encoding="utf-8")) == entry
+            assert not pending.exists()
+            assert load_project(project_name).tasks[0].status == "COMPLETED"
+        finally:
+            os.chdir(cwd)
+
+
+def test_running_task_discards_uncommitted_source_and_artifact_on_recovery():
+    from acquisition import add_candidate, start_task
+    from orchestrator import _stage_source_transaction, process_pending
+    from project import create_project, load_project, project_dir, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"source-rollback-{Path(tmp).name}"
+            url = "https://example.com/rollback-source"
+            save_project(create_project(project_name))
+            add_candidate(project_name, url)
+            task = start_task(project_name, url)
+            artifact = project_dir(project_name) / "assets" / "originals" / "video.mp4"
+            artifact.write_text("uncommitted media")
+            entry = {
+                "source_id": f"source-{task.task_id}",
+                "display_url": url,
+                "final_status": "SUCCESS",
+            }
+            pending = _stage_source_transaction(
+                project_name,
+                task.task_id,
+                entry,
+                [artifact],
+            )
+
+            result = process_pending(project_name)
+
+            assert result["recovered"] == 1
+            assert load_project(project_name).tasks[0].status == "FAILED"
+            assert not pending.exists()
+            assert not artifact.exists()
+            assert not (pending.parent / f"{entry['source_id']}.json").exists()
+        finally:
+            os.chdir(cwd)
+
+
+def test_sanitized_task_reaches_failed_terminal_state():
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from project import create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"sanitized-task-{Path(tmp).name}"
+            save_project(create_project(project_name))
+            add_candidate(project_name, "https://example.com/video?token=secret")
+
+            result = process_pending(project_name)
+
+            task = load_project(project_name).tasks[0]
+            assert result["processed"] == 1
+            assert result["failed"] == 1
+            assert task.status == "FAILED"
+            assert task.error is not None
+        finally:
+            os.chdir(cwd)

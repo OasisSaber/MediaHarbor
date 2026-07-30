@@ -42,3 +42,12 @@
 - Missing optional tools degrade gracefully
 - No automatic tool installation or upgrade
 - Tokens and auth params are redacted from logs
+
+## Crash Recovery
+
+- `project.json` is replaced atomically; `.bak` keeps the last valid committed version.
+- A missing or invalid `project.json` is restored from a valid `.bak` when loaded.
+- Each started task has its own exception boundary, so one failure does not stop the queue.
+- Tasks left `RUNNING` by an interrupted process become `FAILED` on the next orchestration run.
+- A source manifest is staged as a local pending transaction before project completion. Completed
+  transactions are published on recovery; uncommitted transactions and their artifacts are removed.

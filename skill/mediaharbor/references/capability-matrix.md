@@ -33,6 +33,7 @@
 | Path validation (safe project names, anti-traversal) | VERIFIED |
 | Acquisition projects (schema_version, project_id, atomic writes) | VERIFIED |
 | Task state machine (PENDING/RUNNING/COMPLETED/FAILED/SKIPPED) | VERIFIED |
+| Interrupted task and source transaction recovery | FIXTURE_VERIFIED |
 | Orchestrator (candidate → router → download → ffprobe → hash → source.json → report) | FIXTURE_VERIFIED |
 | source.json generation | FIXTURE_VERIFIED |
 | Output organization (output/<project-name>/ subdirectories) | VERIFIED |
