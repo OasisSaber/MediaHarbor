@@ -1,6 +1,12 @@
 ## Related task
 
+<!-- 二选一，删除不适用项。不得保留占位文本或伪造 Issue 编号。-->
+
 - Issue: Closes #<number>
+- Explicit human authorization:
+  - Authorization source:
+  - Goal:
+  - Scope:
 
 ## Result
 
@@ -16,4 +22,4 @@
 - [ ] 必要验证已通过
 - [ ] 没有遗留调试代码、临时文件或缓存
 
-## Known limitations
+## Notes for human
