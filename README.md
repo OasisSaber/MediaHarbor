@@ -17,10 +17,12 @@ Full package 可以包含第三方下载工具，但在 [Issue #27](https://gith
 让 Agent 按顺序读取：
 
 1. [`AGENT_READ_ME_FIRST.md`](AGENT_READ_ME_FIRST.md)
-2. [`skill/mediaharbor/SKILL.md`](skill/mediaharbor/SKILL.md)
-3. [`download-tools/tools.json`](download-tools/tools.json)
+2. [`skill/mediaharbor/SKILL.md`](skill/mediaharbor/SKILL.md) — 触发条件、三方角色、8 步工作流、信任模型、状态码与安全边界
+3. `skill/mediaharbor/references/` — 详细参考（workflow / status-codes / tooling / security / capability-matrix）
+4. [`download-tools/tools.json`](download-tools/tools.json) 与 `download-tools/routing.json`
 
-首次执行时在 MediaHarbor 根目录自动创建 `output/`，所有素材产物写入 `output/<project-name>/`。
+首次执行时在 MediaHarbor 根目录自动创建 `output/`，所有素材产物写入 `output/<project-name>/`，
+报告生成于 `output/<project-name>/reports/`（`COVERAGE_REPORT.md`、`HUMAN_EDITOR_HANDOFF.md`）。
 
 ## 默认工作流与信任模型
 
@@ -33,7 +35,7 @@ Full package 可以包含第三方下载工具，但在 [Issue #27](https://gith
 
 ## 工作流
 
-已有文案 → Agent 分析人物、事件、年份、地点和视觉需求 → Agent 默认从 Bilibili、YouTube 等已配置来源搜索候选页面 → Agent 将候选 URL 交给 MediaHarbor → MediaHarbor 选择并调用本地下载工具 → 下载视频、字幕、缩略图和元数据 → ffprobe 验证 → 重命名、归档和生成素材清单 → 人工审核与剪辑
+已有文案 → Agent 分析人物、事件、年份、地点和视觉需求 → Agent 生成多策略检索词 → Agent 默认从 Bilibili、YouTube 等已配置来源搜索候选页面 → Agent 将候选 URL 交给 MediaHarbor → MediaHarbor 匹配路由表并受控调用本地下载工具（多后端故障转移）→ 下载视频、字幕、缩略图和元数据 → ffprobe 验证 → 重命名、归档并生成 `source.json` 素材清单 → 生成覆盖报告与人工交接文档 → 人工审核与剪辑
 
 ## 三方角色
 
@@ -49,7 +51,8 @@ MediaHarbor 目前是实验性项目。核心的候选入队、多后端下载�
 
 ## 能力与限制
 
-参见 [`skill/mediaharbor/references/capability-matrix.md`](skill/mediaharbor/references/capability-matrix.md)。
+参见 [`skill/mediaharbor/references/capability-matrix.md`](skill/mediaharbor/references/capability-matrix.md)；
+使用细节见 [`skill/mediaharbor/SKILL.md`](skill/mediaharbor/SKILL.md) 及其 references。
 
 ## Development
 
