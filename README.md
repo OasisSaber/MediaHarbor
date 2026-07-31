@@ -24,6 +24,9 @@ Full package 可以包含第三方下载工具，但在 [Issue #27](https://gith
 首次执行时在 MediaHarbor 根目录自动创建 `output/`，所有素材产物写入 `output/<project-name>/`，
 报告生成于 `output/<project-name>/reports/`（`COVERAGE_REPORT.md`、`HUMAN_EDITOR_HANDOFF.md`）。
 
+> 需要单文件分发版（SKILL.md 与全部 references 合并为一个文件）？
+> 参见 [`docs/mediaharbor-skill-single-file.md`](docs/mediaharbor-skill-single-file.md)。
+
 ## 默认工作流与信任模型
 
 - 上层搜索 Harness 默认搜索 Bilibili 和 YouTube 的公开页面。
