@@ -1,32 +1,37 @@
 ---
 name: mediaharbor
-description: Use MediaHarbor to collect video editing materials from an existing script by planning searches, submitting candidate URLs, invoking local download tools, validating media, and organizing outputs inside the portable MediaHarbor workspace.
+description: Collect video editing materials for an existing script with MediaHarbor: analyze the script for people, events, years, locations and visual needs, generate multi-strategy search terms, search candidate video pages (default Bilibili and YouTube), enqueue candidate URLs, download through local tools, ffprobe-validate, archive, and hand off to the human editor. Trigger when the user provides a script or copy and asks to find, download, or collect video materials, or explicitly activates MediaHarbor.
 ---
 
 ## Trigger
 
-Human provides an existing script or text and asks to find matching video materials, OR human explicitly activates MediaHarbor for material collection.
+The human provides an existing script or text and asks to find matching video materials, OR the human explicitly activates MediaHarbor for material collection.
 
-## Responsibilities
+## Roles
 
-1. Read and analyze the script to extract people, events, years, locations, and visual needs.
-2. Generate search terms across multiple strategies (keyword, reverse image, scene description).
-3. Search the internet for candidate video pages (this is Agent / Harness responsibility, not MediaHarbor core responsibility).
-4. Submit candidate URLs to MediaHarbor's download queue.
-5. Invoke local download tools through controlled subprocess calls.
-6. Validate downloaded media with ffprobe.
-7. Rename, organize, and generate a material manifest.
-8. Hand off to the human editor for relevance, quality, copyright, and final editing decisions.
+- **Agent (this model)**: understands the script, generates search terms, searches and filters candidate URLs, submits download tasks, organizes and reports.
+- **MediaHarbor core**: discovers and checks tools, invokes download tools under controlled subprocesses, provides limited failover, media validation, archiving, and reporting.
+- **Human editor**: judges material relevance, quality, and copyright suitability, and performs the final editing. Human review is not a mandatory security gate before each download.
 
-## Default Workflow and Trust Model
+## Default Workflow (end to end)
 
-- MediaHarbor is designed for a local, single-user experimental workspace controlled by the operator.
-- The default search Harness searches public Bilibili and YouTube pages.
-- The Agent may submit and download supported candidates unattended. Per-URL human approval is not required.
+1. **Analyze the script**: extract people, events, years, locations, time spans, and visual needs.
+2. **Generate search terms**: cover multiple strategies (keyword, reverse image description, scene description).
+3. **Search candidate pages**: default scope is public Bilibili and YouTube pages; this is a default search scope, not a hard hostname allowlist in the download core.
+4. **Enqueue candidate URLs**: add candidate URLs to the acquisition project task queue (status `PENDING`).
+5. **Controlled download**: match the routing table, select a backend, invoke the local download tool via a subprocess argument array, fail over across backends in order.
+6. **Validate**: ffprobe checks a non-empty file, location inside the output directory, parseable media, duration > 0, and a video stream.
+7. **Archive**: rename to `task_id-original name`, move to `assets/originals/`, write per-source `source.json` manifests (sha256 + ffprobe metadata), update the project materials table.
+8. **Report and hand off**: generate a coverage report and a human editor handoff document; the human reviews and edits.
+
+## Trust Model
+
+- Designed for a local, single-user experimental workspace controlled by the operator.
+- The default search harness searches public Bilibili and YouTube pages.
+- The Agent may submit and download supported candidates unattended; per-URL human approval is not required.
 - Bilibili and YouTube are the default search scope, not a hard hostname allowlist in the download core.
 - MediaHarbor may continue to process other URLs explicitly supported by `routing.json`, configured backends, and local tools.
-- Human review is for material relevance, quality, copyright suitability, and final editing; it is not a mandatory security gate before each download.
-- Do not expose MediaHarbor as a public arbitrary-URL download API or accept tasks from untrusted multi-user sources under this trust model.
+- Do not expose MediaHarbor as a public arbitrary-URL download API or accept tasks from untrusted multi-user sources.
 
 ## Directory Layout
 
@@ -40,12 +45,12 @@ MediaHarbor/
 │  │  ├─ locate_root.py       # Print MediaHarbor root path
 │  │  └─ check_tools.py       # Print tool availability status
 │  └─ references/
-├─ download-tools/            # Tool index (tools.json) + optional local tool binaries
-│  ├─ tools.json
-│  └─ README.md
+├─ download-tools/            # Tool index (tools.json, routing.json) + optional local tool binaries
 └─ output/                    # Created on first use
    └─ <project-name>/
 ```
+
+Project names must be safe: no path separators, no path traversal (`..`), no Windows reserved names (CON/PRN/AUX/NUL/COM1-9/LPT1-9), no illegal characters `<>:"|?*` or control characters, length <= 128.
 
 ## Tool Check
 
@@ -57,28 +62,40 @@ python skill/mediaharbor/scripts/check_tools.py --json
 
 Returns `READY`, `DEGRADED`, or missing tool status.
 
-## Security and Access Boundaries
+Required tools: yt-dlp (probe/VOD/subtitles/metadata), ffmpeg (merge/convert), ffprobe (validation).
+Optional tools: yutto (Bilibili), streamlink (live), N_m3u8DL-RE (HLS/DASH/MSS), gallery-dl (social/galleries).
 
-- All external tools are invoked via subprocess with argument arrays (no `shell=True`).
-- Never construct commands from web page titles, descriptions, or comments.
-- Tool retry count is limited.
-- DRM detection stops processing.
-- Login-gated content returns `AUTH_REQUIRED`.
-- Never request, echo, or save cookies or credentials.
-- Do not bypass DRM, authentication, paywalls, region restrictions, or site access controls.
-- Do not add a mandatory per-URL confirmation step for normal supported public-page downloads in the local single-user workflow.
+## Controlled Subprocess Rules
 
-## Error Handling
+- Always invoke with argument arrays (no `shell=True`); parameters must be whitelisted; never build commands from arbitrary strings found in web page titles, descriptions, or comments.
+- All operations have finite timeouts; retry counts are finite.
+- Sensitive URL parameters (token/key/sign/auth/session etc.) are redacted as `REDACTED` in logs and outputs.
 
-Structured status values include:
+## Structured Status Codes
 
-- `READY` — tool available
-- `UNSUPPORTED_URL` — URL or route not supported
-- `AUTH_REQUIRED` — login required
-- `GEO_RESTRICTED` — region blocked
-- `DRM_DETECTED` — protected content
-- `RATE_LIMITED` — rate limited
-- `DOWNLOAD_FAILED` — general failure
+Tool statuses: `READY`, `DEGRADED`, `MISSING`.
+Operation statuses: `SUCCESS`, `TOOL_MISSING`, `UNSUPPORTED_URL`, `AUTH_REQUIRED`, `GEO_RESTRICTED`, `DRM_DETECTED`, `RATE_LIMITED`, `TIMEOUT`, `DOWNLOAD_FAILED`, `VALIDATION_FAILED`, `OS_ERROR`, `INTERNAL_ERROR`, `CONFIG_ERROR`.
+
+Terminal statuses (stop immediately, never retry): `DRM_DETECTED`, `AUTH_REQUIRED`, `GEO_RESTRICTED`, `UNSUPPORTED_URL`.
+Retryable statuses: `TIMEOUT`, `DOWNLOAD_FAILED`, `OS_ERROR`, `RATE_LIMITED`.
+
+## Project Data Structures
+
+- **Task state machine**: `PENDING → RUNNING → COMPLETED/FAILED`, `FAILED → PENDING` (retry), `PENDING → SKIPPED`, `SKIPPED → PENDING`. Invalid transitions are treated as programming errors.
+- **Source manifest**: each successful source produces `source.json` with source_id, display_url (sanitized), selected_backend, attempt_history (backend/status/error per attempt), local_files, subtitles, thumbnail, sha256, ffprobe_result (format/duration/resolution/codecs), acquisition_timestamp, and a copyright notice.
+- **Crash recovery**: `project.json` is replaced atomically with a `.bak` fallback; `RUNNING` tasks left by an interruption become `FAILED` on the next run; source manifests are staged as pending transactions and cleaned up when incomplete.
+
+## Reports and Handoff
+
+- `COVERAGE_REPORT.md`: total/completed/failed/pending task counts, candidate URLs and status per story node, material list.
+- `HUMAN_EDITOR_HANDOFF.md`: material paths, sources, durations, resolutions; original script; important note — a successful download does not mean the material fits the edit; the human is responsible for clip selection, pacing, narrative fit, and verifying copyright before publication.
+
+## Security Boundaries (hard constraints)
+
+- Never request, echo, or save cookies or credentials (no `cookies.txt`, `auth.toml`, `.env`).
+- Never bypass DRM, paywalls, login, region restrictions, or site access controls; stop and return a structured status.
+- Never construct commands from web page content; never modify files or binaries in the download tool directory.
+- Do not claim capabilities outside the capability matrix (no video content understanding, no automatic editing, no built-in search engine).
 
 ## Release Modes
 
@@ -92,3 +109,11 @@ This is an experimental release phase. The core acquisition chain is implemented
 Stable CLI coverage, cross-platform tool resolution, retry governance, focused fallback integration tests, and several reliability improvements remain active work. See `references/capability-matrix.md` for implemented capabilities and repository Issue #18 for the current roadmap.
 
 **Do not claim capabilities not listed in the capability matrix.**
+
+## References
+
+- `references/workflow.md` — end-to-end step details, search strategies, failover and recovery
+- `references/status-codes.md` — status code meanings, classification rules, retry governance, crash recovery
+- `references/tooling.md` — download tool roles, invocation templates, routing table design, artifact classification
+- `references/security.md` — security boundaries and access control checklist
+- `references/capability-matrix.md` — implemented capabilities and known limitations (do not overclaim)
