@@ -1,7 +1,33 @@
 # Download Tools
 
-This directory contains the tool index (`tools.json`) and subdirectories for each download tool.
+This directory holds the tool inventory and routing configuration for MediaHarbor. **Do not submit third-party binaries to this repository** — binary tools must be obtained separately and placed in the corresponding subdirectory (e.g., `yt-dlp/yt-dlp.exe`).
 
-**Do not submit third-party binaries to this repository.** Binary tools must be obtained separately by the user and placed in the corresponding subdirectory (e.g., `yt-dlp/yt-dlp.exe`).
+## Files
 
-See `tools.json` for the canonical tool inventory, roles, and path expectations.
+| File | Purpose |
+|---|---|
+| `tools.json` | Canonical tool inventory: per-tool roles, `required` flags, and per-platform relative paths (schema_version=1) |
+| `routing.json` | URL routing table: regex patterns → ordered backend lists, `max_retries`, `drm_stop` (schema_version=1) |
+| `tool-metadata.json` | Upstream provenance metadata (name, repository, license) for full-package manifests |
+| `THIRD_PARTY_NOTICES.md` | Third-party tool licenses and sources |
+| `README.md` | This file |
+
+## Tool Inventory (tools.json)
+
+Required tools: yt-dlp (probe/vod/playlist/subtitle/metadata), ffmpeg (merge/convert), ffprobe (validate).
+Optional tools: yutto (bilibili), streamlink (live), N_m3u8DL-RE (hls/dash/mss), gallery-dl (social/gallery/post-media).
+
+Primary platform is Windows x64; Linux/macOS paths are best-effort placeholders. All paths must be relative — absolute paths, path traversal, and illegal characters are rejected.
+
+## Routing (routing.json)
+
+Routes match URLs in order; the first hit wins. Default routes:
+
+- bilibili: `bilibili\.com` / `b23\.tv` → yt-dlp, yutto
+- hls-dash: `\.m3u8` / `\.mpd` → yt-dlp, n-m3u8dl-re
+- social: twitter/x/instagram/reddit/tumblr/pixiv → gallery-dl, yt-dlp
+- vod: `^https?://` → yt-dlp
+
+Editing the routing table only allows whitelisted backend names and validated regex; invalid entries reject the whole table.
+
+See `../skill/mediaharbor/references/tooling.md` for invocation templates, artifact discovery, and routing semantics.
