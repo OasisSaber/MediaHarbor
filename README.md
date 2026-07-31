@@ -1,67 +1,40 @@
 # MediaHarbor
 
-MediaHarbor 是一个放入 Agent 工作区即可使用的便携式视频素材采集工具包。它面向本地、单用户的实验性 Agent 工作流，**不采用传统安装方式**。
+MediaHarbor 是一个本地、单用户、Windows x64 优先的 Agent Skill 源码仓库，用于从已有文案采集视频素材。
+
+## 定位
+
+- 当前只正式支持 **Windows x64**（Ubuntu CI 仅验证纯 Python 测试可运行，不代表 Linux 平台支持）。
+- 运行要求：Windows x64、**Python 3.11+**，以及按 `download-tools/tools.json` 配置的本地第三方工具。
+- 面向操作者控制的本地单用户实验性工作区；不是公共任意 URL 下载服务。
+- 便携部署：克隆整个仓库即可使用，不采用传统安装方式。
 
 ## 部署
 
-### Shell package / 源码目录
-
-将整个 `MediaHarbor/` 文件夹放入 Agent 工作区，并按 `download-tools/tools.json` 配置所需的第三方下载工具。
-
-### Full package
-
-Full package 可以包含第三方下载工具，但在 [Issue #27](https://github.com/OasisSaber/MediaHarbor/issues/27) 完成前，不应宣称其中二进制的来源、版本、哈希和许可证已经过完整供应链验证。
+1. 将整个仓库克隆到 Agent 工作区。
+2. 按 [`download-tools/tools.json`](download-tools/tools.json) 的声明，把第三方下载工具放入对应子目录（如 `download-tools/yt-dlp/yt-dlp.exe`）。MediaHarbor 不自动下载、安装或升级工具。
+3. 无需 `pip install`，直接运行 `skill/mediaharbor/scripts/` 下的脚本。
 
 ## Agent 入口
 
-让 Agent 按顺序读取：
-
 1. [`AGENT_READ_ME_FIRST.md`](AGENT_READ_ME_FIRST.md)
-2. [`skill/mediaharbor/SKILL.md`](skill/mediaharbor/SKILL.md) — 触发条件、三方角色、8 步工作流、信任模型、状态码与安全边界
-3. `skill/mediaharbor/references/` — 详细参考（workflow / status-codes / tooling / security / capability-matrix）
-4. [`download-tools/tools.json`](download-tools/tools.json) 与 `download-tools/routing.json`
+2. [`skill/mediaharbor/SKILL.md`](skill/mediaharbor/SKILL.md) — 唯一权威 Skill 文档（触发条件、工作流、工具检查、状态码、安全边界、失败处理）
 
-首次执行时在 MediaHarbor 根目录自动创建 `output/`，所有素材产物写入 `output/<project-name>/`，
-报告生成于 `output/<project-name>/reports/`（`COVERAGE_REPORT.md`、`HUMAN_EDITOR_HANDOFF.md`）。
+首次执行时在仓库根目录自动创建 `output/`，所有素材产物写入 `output/<project-name>/`，报告位于 `output/<project-name>/reports/`。
 
-> 需要单文件分发版（SKILL.md 与全部 references 合并为一个文件）？
-> 参见 [`docs/mediaharbor-skill-single-file.md`](docs/mediaharbor-skill-single-file.md)。
+统一 Agent 面向 CLI 见 Issue #29（未实现）。在 #29 完成前，`skill/mediaharbor/scripts/` 下的内部脚本是唯一入口；其中 `download.py` 为 legacy/internal，`probe.py` 为内部诊断入口，不属于正常 Skill 工作流。
 
-## 默认工作流与信任模型
+## 主要限制
 
-- 上层搜索 Harness 默认搜索 Bilibili 和 YouTube 的公开页面。
-- Agent 可以无人值守提交候选并自动下载，不要求对每条 URL 逐项人工确认。
-- Bilibili 和 YouTube 是默认搜索范围，不是 MediaHarbor 下载内核的强制域名白名单。
-- MediaHarbor 仍可依据 `routing.json`、backend 和本地配置处理明确支持的其他 URL。
-- MediaHarbor 仅面向操作者控制的本地单用户环境，不提供面向陌生用户的公共任意 URL 下载 API。
-- 版权授权、素材使用范围和最终发布责任由实际使用方判断。
-
-## 工作流
-
-已有文案 → Agent 分析人物、事件、年份、地点和视觉需求 → Agent 生成多策略检索词 → Agent 默认从 Bilibili、YouTube 等已配置来源搜索候选页面 → Agent 将候选 URL 交给 MediaHarbor → MediaHarbor 匹配路由表并受控调用本地下载工具（多后端故障转移）→ 下载视频、字幕、缩略图和元数据 → ffprobe 验证 → 重命名、归档并生成 `source.json` 素材清单 → 生成覆盖报告与人工交接文档 → 人工审核与剪辑
-
-## 三方角色
-
-- **Agent / Harness**：理解文案、生成检索词、搜索和筛选候选 URL、调用 Skill，并在支持范围内自动提交下载任务。
-- **MediaHarbor**：发现工具、受控调用、有限容灾、验证、整理和报告。
-- **人工**：判断素材相关性、质量和版权适用性，并完成最终剪辑；人工审核不是每次下载前的安全审批门禁。
-
-## 当前阶段
-
-MediaHarbor 目前是实验性项目。核心的候选入队、多后端下载、媒体验证、素材归档、项目状态和报告链路已经实现，但稳定 CLI、跨平台工具解析、重试治理和部分可靠性收尾仍在迭代。
-
-当前推荐优先使用本地 Windows 工作流。真实下载能力取决于本机第三方工具、网站状态和路由配置。实验稳定化路线见 [Issue #18](https://github.com/OasisSaber/MediaHarbor/issues/18)。
-
-## 能力与限制
-
-参见 [`skill/mediaharbor/references/capability-matrix.md`](skill/mediaharbor/references/capability-matrix.md)；
-使用细节见 [`skill/mediaharbor/SKILL.md`](skill/mediaharbor/SKILL.md) 及其 references。
+- 只正式支持 Windows x64；Linux/macOS 路径不做承诺。
+- 无内置搜索引擎（搜索由 Agent 完成）、无视频内容理解、无自动剪辑/时间线。
+- 不保存凭据；不绕过 DRM、付费墙、登录或区域限制；不修改 `download-tools/` 中的文件或二进制。
+- 真实下载能力取决于本机第三方工具、网站状态和路由配置；下载成功不代表素材适合剪辑，版权与最终剪辑由人工负责。
 
 ## Development
 
 开发本仓库的编码 Agent 和贡献者参见 [`AGENTS.md`](AGENTS.md) 和 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
-本项目的 AgenticWonderwall 采纳范围、版本和仓库设置门禁记录在
-[`docs/agenticwonderwall-adoption.md`](docs/agenticwonderwall-adoption.md)。
+验证入口：`scripts/validate.sh`（Windows 等价：`scripts/validate.ps1`）。
 
 ## License
 

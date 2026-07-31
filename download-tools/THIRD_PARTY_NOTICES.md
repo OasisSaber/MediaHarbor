@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-MediaHarbor is designed to work with the following third-party tools. These tools are not bundled in the repository and must be obtained separately.
+MediaHarbor works with the following third-party tools. These tools are not bundled in the repository and must be obtained separately.
 
 ## Downloader Tools
 

@@ -6,18 +6,19 @@ This directory holds the tool inventory and routing configuration for MediaHarbo
 
 | File | Purpose |
 |---|---|
-| `tools.json` | Canonical tool inventory: per-tool roles, `required` flags, and per-platform relative paths (schema_version=1) |
+| `tools.json` | Canonical tool inventory: per-tool roles, `required` flags, and Windows x64 relative paths (schema_version=1) |
 | `routing.json` | URL routing table: regex patterns → ordered backend lists, `max_retries`, `drm_stop` (schema_version=1) |
-| `tool-metadata.json` | Upstream provenance metadata (name, repository, license) for full-package manifests |
 | `THIRD_PARTY_NOTICES.md` | Third-party tool licenses and sources |
 | `README.md` | This file |
 
 ## Tool Inventory (tools.json)
 
+Current official platform: **Windows x64 only**.
+
 Required tools: yt-dlp (probe/vod/playlist/subtitle/metadata), ffmpeg (merge/convert), ffprobe (validate).
 Optional tools: yutto (bilibili), streamlink (live), N_m3u8DL-RE (hls/dash/mss), gallery-dl (social/gallery/post-media).
 
-Primary platform is Windows x64; Linux/macOS paths are best-effort placeholders. All paths must be relative — absolute paths, path traversal, and illegal characters are rejected.
+All paths must be relative — absolute paths, path traversal, and illegal characters are rejected.
 
 ## Routing (routing.json)
 
@@ -30,4 +31,4 @@ Routes match URLs in order; the first hit wins. Default routes:
 
 Editing the routing table only allows whitelisted backend names and validated regex; invalid entries reject the whole table.
 
-See `../skill/mediaharbor/references/tooling.md` for invocation templates, artifact discovery, and routing semantics.
+Invocation templates, artifact discovery, and routing semantics are documented in `../skill/mediaharbor/SKILL.md`.

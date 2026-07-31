@@ -12,6 +12,8 @@ permissions:
   pull-requests: read
 
 jobs:
+  # Note: this Ubuntu job only proves that the pure-Python tests run.
+  # MediaHarbor officially supports Windows x64 only; it is NOT a Linux platform support statement.
   check-ubuntu:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -24,8 +26,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
-        run: python -m pip install -e ".[dev]"
+      - name: Install dev dependencies
+        run: python -m pip install pytest ruff
 
       - name: Ruff format check
         run: python -m ruff format --check .
@@ -54,8 +56,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies
-        run: python -m pip install -e ".[dev]"
+      - name: Install dev dependencies
+        run: python -m pip install pytest ruff
 
       - name: Ruff format check
         run: python -m ruff format --check .

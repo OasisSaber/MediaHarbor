@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Internal diagnostic entry point: probe URLs with yt-dlp for debugging only.
 from __future__ import annotations
 
 import argparse
