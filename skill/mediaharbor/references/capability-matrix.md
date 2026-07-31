@@ -20,7 +20,7 @@
 | Tool existence check | VERIFIED |
 | Current-platform tool path resolution | PARTIAL |
 | ProcessRunner (controlled subprocess, no shell=True, retry) | VERIFIED |
-| Error classification (12 operation statuses) | VERIFIED |
+| Error classification (13 operation statuses) | VERIFIED |
 | yt-dlp adapter (probe + download with structured output) | FIXTURE_VERIFIED |
 | ffprobe validation (media file verification) | FIXTURE_VERIFIED |
 | Post-download validation chain | FIXTURE_VERIFIED |
