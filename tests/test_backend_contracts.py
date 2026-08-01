@@ -103,7 +103,8 @@ class TestYuttoContract:
 
 
 class TestNm3u8dlreContract:
-    def test_tool_missing_returns_backend_result(self, tmp_path):
+    @patch("backends.n_m3u8dl_re.resolve_n_m3u8dl_re", return_value=None)
+    def test_tool_missing_returns_backend_result(self, mock_resolve, tmp_path):
         from backends.n_m3u8dl_re import run_n_m3u8dl_re
 
         result = run_n_m3u8dl_re("https://example.com/stream.m3u8", tmp_path)
@@ -121,7 +122,8 @@ class TestGalleryDlContract:
 
 
 class TestYtdlpAdapterContract:
-    def test_tool_missing_returns_backend_result(self, tmp_path):
+    @patch("ytdlp_adapter.resolve_ytdlp", return_value=None)
+    def test_tool_missing_returns_backend_result(self, mock_resolve, tmp_path):
         from ytdlp_adapter import download_url
 
         result = download_url("https://youtube.com/watch?v=test", tmp_path)
