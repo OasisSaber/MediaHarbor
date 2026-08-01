@@ -166,6 +166,42 @@ class TestYtdlpAdapterContract:
         assert [Path(path).name for path in media_types["info_json"]] == [names[3]]
 
     @patch("ytdlp_adapter.resolve_ytdlp")
+    def test_classifies_danmaku_as_info_json(self, mock_resolve, tmp_path):
+        from ytdlp_adapter import download_url
+
+        mock_resolve.return_value = Path("/fake/yt-dlp")
+        names = [
+            "BiliBili-BV1xxx.mp4",
+            "BiliBili-BV1xxx.danmaku.xml",
+            "BiliBili-BV1xxx.info.json",
+        ]
+
+        class WritingRunner:
+            def run(self, _cmd, **_kwargs):
+                for name in names:
+                    _make_file(tmp_path, name)
+                return ProcessResult(
+                    returncode=0,
+                    stdout=f"{tmp_path / names[0]}\n",
+                    stderr="",
+                    status=SUCCESS,
+                )
+
+        result = download_url(
+            "https://www.bilibili.com/video/BV1xxx",
+            tmp_path,
+            runner=WritingRunner(),
+        )
+
+        assert result.status == SUCCESS
+        media_types = result.metadata["media_types"]
+        assert [Path(path).name for path in media_types["main"]] == [names[0]]
+        assert [Path(path).name for path in media_types["info_json"]] == [
+            names[1],
+            names[2],
+        ]
+
+    @patch("ytdlp_adapter.resolve_ytdlp")
     def test_success_excludes_preexisting_output(self, mock_resolve, tmp_path):
         from ytdlp_adapter import download_url
 
