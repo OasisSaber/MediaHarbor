@@ -194,6 +194,9 @@ def complete_task(
     height: int | None = None,
     quality_status: str | None = None,
     quality_reasons: list[str] | None = None,
+    editorial_status: str | None = None,
+    editorial_reasons: list[str] | None = None,
+    visual_analysis: dict | None = None,
 ) -> DownloadTask | None:
     if not output_paths:
         raise ValueError("output_paths must not be empty")
@@ -228,8 +231,10 @@ def complete_task(
             verified=True,
             technical_status="PASS",
             quality_status=quality_status or "UNKNOWN",
-            editorial_status="UNREVIEWED",
+            editorial_status=editorial_status or "UNREVIEWED",
             quality_reasons=list(quality_reasons) if quality_reasons else [],
+            editorial_reasons=list(editorial_reasons) if editorial_reasons else [],
+            visual_analysis=visual_analysis,
             assessment_timestamp=assessment_time,
         )
         project.materials.append(material)

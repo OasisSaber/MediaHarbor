@@ -1059,3 +1059,155 @@ def test_process_pending_sets_quality_status_from_ffprobe():
             assert material.technical_status == "PASS"
         finally:
             os.chdir(cwd)
+
+
+def test_visual_risk_sets_editorial_review_required():
+    from unittest.mock import patch
+
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult, ProcessResult
+    from project import create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"visual-risk-{Path(tmp).name}"
+            save_project(create_project(project_name))
+            add_candidate(project_name, "https://example.com/risk")
+
+            def fake_download(_url, output_dir, runner=None, format_selector=None):
+                del runner, format_selector
+                media = output_dir / "video.mp4"
+                media.write_text("media")
+                return BackendResult(status=SUCCESS, output_paths=[media]), "yt-dlp"
+
+            with (
+                patch("orchestrator.download_with_fallback", side_effect=fake_download),
+                patch("orchestrator._validate_downloaded_file") as validation,
+                patch("orchestrator.analyze_media") as mock_analyze,
+            ):
+                validation.return_value = ProcessResult(
+                    returncode=0,
+                    stdout="validated",
+                    stderr="",
+                    status=SUCCESS,
+                )
+                mock_analyze.return_value = {
+                    "status": "PERSISTENT_SUBTITLES",
+                    "labels": [{"label": "PERSISTENT_SUBTITLES", "score": 0.8, "confidence": 0.8}],
+                    "metrics": {"subtitle_persistence": 1.0},
+                    "ocr_status": "heuristic",
+                }
+                results = process_pending(project_name)
+
+            assert results["success"] == 1
+            material = load_project(project_name).materials[0]
+            assert material.editorial_status == "REVIEW_REQUIRED"
+            assert any("PERSISTENT_SUBTITLES" in r for r in material.editorial_reasons)
+            assert material.visual_analysis["status"] == "PERSISTENT_SUBTITLES"
+        finally:
+            os.chdir(cwd)
+
+
+def test_visual_analysis_unavailable_does_not_block():
+    from unittest.mock import patch
+
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult, ProcessResult
+    from project import create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"visual-unavailable-{Path(tmp).name}"
+            save_project(create_project(project_name))
+            add_candidate(project_name, "https://example.com/clean")
+
+            def fake_download(_url, output_dir, runner=None, format_selector=None):
+                del runner, format_selector
+                media = output_dir / "video.mp4"
+                media.write_text("media")
+                return BackendResult(status=SUCCESS, output_paths=[media]), "yt-dlp"
+
+            with (
+                patch("orchestrator.download_with_fallback", side_effect=fake_download),
+                patch("orchestrator._validate_downloaded_file") as validation,
+                patch("orchestrator.analyze_media") as mock_analyze,
+            ):
+                validation.return_value = ProcessResult(
+                    returncode=0,
+                    stdout="validated",
+                    stderr="",
+                    status=SUCCESS,
+                )
+                mock_analyze.return_value = {
+                    "status": "ANALYSIS_UNAVAILABLE",
+                    "labels": [],
+                    "metrics": {},
+                    "ocr_status": "unavailable",
+                    "note": "ffmpeg unavailable",
+                }
+                results = process_pending(project_name)
+
+            assert results["success"] == 1
+            material = load_project(project_name).materials[0]
+            assert material.editorial_status == "REVIEW_REQUIRED"
+            assert "visual-analysis-unavailable" in material.editorial_reasons
+        finally:
+            os.chdir(cwd)
+
+
+def test_clean_visual_analysis_keeps_unreviewed():
+    from unittest.mock import patch
+
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult, ProcessResult
+    from project import create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"visual-clean-{Path(tmp).name}"
+            save_project(create_project(project_name))
+            add_candidate(project_name, "https://example.com/clean2")
+
+            def fake_download(_url, output_dir, runner=None, format_selector=None):
+                del runner, format_selector
+                media = output_dir / "video.mp4"
+                media.write_text("media")
+                return BackendResult(status=SUCCESS, output_paths=[media]), "yt-dlp"
+
+            with (
+                patch("orchestrator.download_with_fallback", side_effect=fake_download),
+                patch("orchestrator._validate_downloaded_file") as validation,
+                patch("orchestrator.analyze_media") as mock_analyze,
+            ):
+                validation.return_value = ProcessResult(
+                    returncode=0,
+                    stdout="validated",
+                    stderr="",
+                    status=SUCCESS,
+                )
+                mock_analyze.return_value = {
+                    "status": "CLEAN",
+                    "labels": [],
+                    "metrics": {"frames_analyzed": 6},
+                    "ocr_status": "heuristic",
+                }
+                results = process_pending(project_name)
+
+            assert results["success"] == 1
+            material = load_project(project_name).materials[0]
+            assert material.editorial_status == "UNREVIEWED"
+            assert material.editorial_reasons == []
+        finally:
+            os.chdir(cwd)

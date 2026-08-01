@@ -73,6 +73,7 @@ class MaterialInfo:
     override_metadata: dict | None = None
     assessment_timestamp: str | None = None
     assessment_schema_version: int = 1
+    visual_analysis: dict | None = None
 
 
 @dataclass
@@ -119,6 +120,7 @@ class Project:
     tasks: list[DownloadTask] = field(default_factory=list)
     materials: list[MaterialInfo] = field(default_factory=list)
     quality_profile: dict | None = None
+    visual_config: dict | None = None
 
     def __post_init__(self):
         now = datetime.now(timezone.utc).isoformat()
@@ -248,6 +250,7 @@ def _project_from_dict(data: dict[str, Any]) -> Project:
         tasks=tasks,
         materials=materials,
         quality_profile=data.get("quality_profile"),
+        visual_config=data.get("visual_config"),
     )
 
 
