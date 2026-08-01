@@ -4,8 +4,36 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from _common import ensure_output_dir
-from project import load_project
+from project import MaterialInfo, load_project
 from safe_path import resolve_project_dir
+
+
+def _material_group(material: MaterialInfo) -> str:
+    if material.editorial_status == "REJECT":
+        return "rejected"
+    if material.editorial_status == "ACCEPT":
+        return "accepted"
+    if material.editorial_status == "REVIEW_REQUIRED":
+        return "needs-review"
+    return "unassessed"
+
+
+def _material_lines(material: MaterialInfo) -> list[str]:
+    lines = [f"  - {material.local_path} ({material.source_url})"]
+    lines.append(
+        f"    - technical: {material.technical_status or 'UNKNOWN'}, "
+        f"quality: {material.quality_status or 'UNKNOWN'}, "
+        f"editorial: {material.editorial_status or 'UNREVIEWED'}"
+    )
+    if material.technical_reasons:
+        lines.append(f"    - technical reasons: {', '.join(material.technical_reasons)}")
+    if material.quality_reasons:
+        lines.append(f"    - quality reasons: {', '.join(material.quality_reasons)}")
+    if material.editorial_reasons:
+        lines.append(f"    - editorial reasons: {', '.join(material.editorial_reasons)}")
+    if material.override_metadata:
+        lines.append(f"    - override: {material.override_metadata}")
+    return lines
 
 
 def generate_coverage_report(project_name: str) -> str | None:
@@ -41,9 +69,18 @@ def generate_coverage_report(project_name: str) -> str | None:
 
     lines.append("")
     lines.append("## Materials")
-    for m in project.materials:
-        status = "✓" if m.verified else "?"
-        lines.append(f"  - {status} {m.local_path} ({m.source_url})")
+    if not project.materials:
+        lines.append("  - (none)")
+    else:
+        groups: dict[str, list[MaterialInfo]] = {}
+        for material in project.materials:
+            groups.setdefault(_material_group(material), []).append(material)
+        for group in ("accepted", "needs-review", "rejected", "unassessed"):
+            members = groups.get(group, [])
+            lines.append("")
+            lines.append(f"### {group.replace('-', ' ')}")
+            for material in members:
+                lines.extend(_material_lines(material))
 
     return "\n".join(lines)
 
@@ -69,6 +106,19 @@ def generate_handoff(project_name: str) -> str | None:
             lines.append(f"  - Duration: {m.duration}s")
         if m.width and m.height:
             lines.append(f"  - Resolution: {m.width}x{m.height}")
+        lines.append(
+            f"  - Technical: {m.technical_status or 'UNKNOWN'} | "
+            f"Quality: {m.quality_status or 'UNKNOWN'} | "
+            f"Editorial: {m.editorial_status or 'UNREVIEWED'}"
+        )
+        if m.technical_reasons:
+            lines.append(f"  - Technical reasons: {', '.join(m.technical_reasons)}")
+        if m.quality_reasons:
+            lines.append(f"  - Quality reasons: {', '.join(m.quality_reasons)}")
+        if m.editorial_reasons:
+            lines.append(f"  - Editorial reasons: {', '.join(m.editorial_reasons)}")
+        if m.override_metadata:
+            lines.append(f"  - Override: {m.override_metadata}")
         lines.append("")
 
     lines.append("## Story Notes")

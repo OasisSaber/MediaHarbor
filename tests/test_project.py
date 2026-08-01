@@ -161,3 +161,74 @@ def test_corrupt_primary_is_restored_from_backup():
             assert json.loads(path.read_text(encoding="utf-8"))["script"] == "version one"
         finally:
             os.chdir(cwd)
+
+
+def test_legacy_material_migrates_to_conservative_assessment():
+    from project import MaterialInfo, _migrate_material_assessment
+
+    verified = MaterialInfo(source_url="u", local_path="p", verified=True)
+    _migrate_material_assessment(verified)
+    assert verified.technical_status == "PASS"
+    assert verified.quality_status == "UNKNOWN"
+    assert verified.editorial_status == "UNREVIEWED"
+
+    unverified = MaterialInfo(source_url="u", local_path="p", verified=False)
+    _migrate_material_assessment(unverified)
+    assert unverified.technical_status == "UNKNOWN"
+
+    explicit = MaterialInfo(
+        source_url="u",
+        local_path="p",
+        verified=True,
+        technical_status="FAIL",
+        quality_status="WARN",
+        editorial_status="REVIEW_REQUIRED",
+    )
+    _migrate_material_assessment(explicit)
+    assert explicit.technical_status == "FAIL"
+    assert explicit.quality_status == "WARN"
+    assert explicit.editorial_status == "REVIEW_REQUIRED"
+
+
+def test_saved_project_roundtrips_assessment_fields():
+    import json
+
+    from project import MaterialInfo, create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "AGENT_READ_ME_FIRST.md").write_text("")
+        (root / "download-tools").mkdir(parents=True)
+        (root / "download-tools" / "tools.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "tools": {"d": {"roles": ["t"], "platforms": {"windows-x64": "d/d.exe"}}},
+                }
+            )
+        )
+        (root / "skill" / "mediaharbor").mkdir(parents=True)
+        (root / "skill" / "mediaharbor" / "SKILL.md").write_text("---\ntitle: test\n---\n")
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("assessment-roundtrip")
+            p.materials.append(
+                MaterialInfo(
+                    source_url="u",
+                    local_path="p",
+                    verified=True,
+                    technical_status="PASS",
+                    quality_status="UNKNOWN",
+                    editorial_status="UNREVIEWED",
+                    assessment_timestamp="2026-01-01T00:00:00+00:00",
+                )
+            )
+            save_project(p)
+            loaded = load_project("assessment-roundtrip")
+            material = loaded.materials[0]
+            assert material.technical_status == "PASS"
+            assert material.quality_status == "UNKNOWN"
+            assert material.editorial_status == "UNREVIEWED"
+        finally:
+            os.chdir(cwd)

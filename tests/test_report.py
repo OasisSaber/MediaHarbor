@@ -77,3 +77,90 @@ def test_save_report_and_handoff():
             assert handoff_path.exists()
         finally:
             os.chdir(cwd)
+
+
+def test_coverage_report_groups_materials_by_editorial_status():
+    from project import MaterialInfo, Project, save_project
+    from report import generate_coverage_report
+
+    p = Project(
+        name="group-test",
+        materials=[
+            MaterialInfo(
+                source_url="https://example.com/a",
+                local_path="a.mp4",
+                verified=True,
+                technical_status="PASS",
+                quality_status="UNKNOWN",
+                editorial_status="UNREVIEWED",
+            ),
+            MaterialInfo(
+                source_url="https://example.com/b",
+                local_path="b.mp4",
+                verified=True,
+                technical_status="PASS",
+                quality_status="WARN",
+                editorial_status="REVIEW_REQUIRED",
+                quality_reasons=["low-resolution"],
+            ),
+            MaterialInfo(
+                source_url="https://example.com/c",
+                local_path="c.mp4",
+                verified=True,
+                technical_status="PASS",
+                quality_status="REJECT",
+                editorial_status="REJECT",
+                override_metadata={"human": "kept for archival"},
+            ),
+        ],
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            save_project(p)
+            report = generate_coverage_report("group-test")
+            assert report is not None
+            assert "### unassessed" in report
+            assert "### needs review" in report
+            assert "### rejected" in report
+            assert "technical: PASS" in report
+            assert "quality: WARN" in report
+            assert "low-resolution" in report
+            assert "kept for archival" in report
+            assert "?" not in report.split("## Materials")[1]
+        finally:
+            os.chdir(cwd)
+
+
+def test_handoff_shows_assessment_states():
+    from project import MaterialInfo, Project, save_project
+    from report import generate_handoff
+
+    p = Project(
+        name="handoff-test",
+        materials=[
+            MaterialInfo(
+                source_url="https://example.com/a",
+                local_path="a.mp4",
+                verified=True,
+                technical_status="PASS",
+                quality_status="UNKNOWN",
+                editorial_status="UNREVIEWED",
+            )
+        ],
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            save_project(p)
+            handoff = generate_handoff("handoff-test")
+            assert handoff is not None
+            assert "Technical: PASS" in handoff
+            assert "Quality: UNKNOWN" in handoff
+            assert "Editorial: UNREVIEWED" in handoff
+        finally:
+            os.chdir(cwd)
