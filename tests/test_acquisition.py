@@ -469,3 +469,33 @@ def test_preflight_duplicate_media_id_rejected_and_override_enqueues():
             assert len(project.tasks) == 1
         finally:
             os.chdir(cwd)
+
+
+def test_complete_task_sets_conservative_assessment_states():
+    from acquisition import add_candidate, complete_task, start_task
+    from project import create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("assessment-task-test")
+            save_project(p)
+            url = "https://example.com/assess"
+            add_candidate("assessment-task-test", url)
+            start_task("assessment-task-test", url)
+            complete_task(
+                "assessment-task-test",
+                url,
+                "yt-dlp",
+                ["output/assessment-task-test/video.mp4"],
+            )
+            project = load_project("assessment-task-test")
+            material = project.materials[0]
+            assert material.technical_status == "PASS"
+            assert material.quality_status == "UNKNOWN"
+            assert material.editorial_status == "UNREVIEWED"
+            assert material.assessment_timestamp is not None
+        finally:
+            os.chdir(cwd)

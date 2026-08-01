@@ -213,6 +213,7 @@ def complete_task(
     if not found:
         return None
     display_url = sanitize_url(url)
+    assessment_time = datetime.now(timezone.utc).isoformat()
     for path in material_paths if material_paths is not None else output_paths:
         material = MaterialInfo(
             source_url=display_url,
@@ -223,6 +224,10 @@ def complete_task(
             width=width,
             height=height,
             verified=True,
+            technical_status="PASS",
+            quality_status="UNKNOWN",
+            editorial_status="UNREVIEWED",
+            assessment_timestamp=assessment_time,
         )
         project.materials.append(material)
     save_project(project)

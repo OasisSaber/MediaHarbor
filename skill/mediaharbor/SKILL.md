@@ -45,20 +45,20 @@ The human provides an existing script or text and asks to find matching video ma
 
 ```
 MediaHarbor/  (repository root = workspace root)
-├─ AGENT_READ_ME_FIRST.md     # Agent entry point (read first)
-├─ skill/mediaharbor/         # The skill
-│  ├─ SKILL.md                # Unique authoritative skill document (this file)
-│  └─ scripts/                # Runnable Python modules (no pip install needed)
-├─ download-tools/            # Tool index (tools.json, routing.json) + tool binaries
-└─ output/                    # Created on first use
-   └─ <project-name>/
-      ├─ project.json         # Project state (atomic writes, .bak fallback)
-      ├─ input/               # Original script
-      ├─ planning/            # Story nodes and search plans
-      ├─ acquisition/         # Task/material state + sources/<source_id>.json
-      ├─ assets/originals/    # Final archived media (task_id-original name)
-      ├─ logs/
-      └─ reports/             # COVERAGE_REPORT.md + HUMAN_EDITOR_HANDOFF.md
+鈹溾攢 AGENT_READ_ME_FIRST.md     # Agent entry point (read first)
+鈹溾攢 skill/mediaharbor/         # The skill
+鈹? 鈹溾攢 SKILL.md                # Unique authoritative skill document (this file)
+鈹? 鈹斺攢 scripts/                # Runnable Python modules (no pip install needed)
+鈹溾攢 download-tools/            # Tool index (tools.json, routing.json) + tool binaries
+鈹斺攢 output/                    # Created on first use
+   鈹斺攢 <project-name>/
+      鈹溾攢 project.json         # Project state (atomic writes, .bak fallback)
+      鈹溾攢 input/               # Original script
+      鈹溾攢 planning/            # Story nodes and search plans
+      鈹溾攢 acquisition/         # Task/material state + sources/<source_id>.json
+      鈹溾攢 assets/originals/    # Final archived media (task_id-original name)
+      鈹溾攢 logs/
+      鈹斺攢 reports/             # COVERAGE_REPORT.md + HUMAN_EDITOR_HANDOFF.md
 ```
 
 Project names must be safe: no path separators, no path traversal (`..`), no Windows reserved names (CON/PRN/AUX/NUL/COM1-9/LPT1-9), no illegal characters `<>:"|?*` or control characters, length <= 128.
@@ -96,14 +96,14 @@ Operation statuses (13): `SUCCESS`, `TOOL_MISSING`, `UNSUPPORTED_URL`, `AUTH_REQ
 
 Classify failures from the return code and merged stdout+stderr, in priority order:
 
-1. Return code 0 → `SUCCESS`.
-2. `widevine`/`playready`/`fairplay`, or both `encrypted` and `drm` → `DRM_DETECTED`.
-3. HTTP 401, `sign in`, `login required`, `private video` → `AUTH_REQUIRED`.
-4. `geo-restricted`, `not available in your country` → `GEO_RESTRICTED`.
-5. `too many requests`, `rate limit`, HTTP 429 → `RATE_LIMITED`.
-6. `unsupported url`, `no video formats found` → `UNSUPPORTED_URL`.
-7. Other non-zero return codes → `DOWNLOAD_FAILED`.
-8. Timeout → `TIMEOUT`; process missing → `TOOL_MISSING`; other OSError → `OS_ERROR`.
+1. Return code 0 鈫?`SUCCESS`.
+2. `widevine`/`playready`/`fairplay`, or both `encrypted` and `drm` 鈫?`DRM_DETECTED`.
+3. HTTP 401, `sign in`, `login required`, `private video` 鈫?`AUTH_REQUIRED`.
+4. `geo-restricted`, `not available in your country` 鈫?`GEO_RESTRICTED`.
+5. `too many requests`, `rate limit`, HTTP 429 鈫?`RATE_LIMITED`.
+6. `unsupported url`, `no video formats found` 鈫?`UNSUPPORTED_URL`.
+7. Other non-zero return codes 鈫?`DOWNLOAD_FAILED`.
+8. Timeout 鈫?`TIMEOUT`; process missing 鈫?`TOOL_MISSING`; other OSError 鈫?`OS_ERROR`.
 
 ## Retry and Recovery
 
@@ -117,15 +117,16 @@ Classify failures from the return code and merged stdout+stderr, in priority ord
 
 ## Project Data Structures
 
-- **Task state machine**: `PENDING → RUNNING → COMPLETED/FAILED`, `FAILED → PENDING` (retry), `PENDING → SKIPPED`, `SKIPPED → PENDING`. Invalid transitions are treated as programming errors.
+- **Task state machine**: `PENDING 鈫?RUNNING 鈫?COMPLETED/FAILED`, `FAILED 鈫?PENDING` (retry), `PENDING 鈫?SKIPPED`, `SKIPPED 鈫?PENDING`. Invalid transitions are treated as programming errors.
 - **Candidate preflight**: each candidate records execution/display URLs, platform and media ID, title, uploader, publish date, duration, live status, a compact format summary (count/max height/max FPS/max bitrate), the search query/strategy, story node, state (`PENDING`/`ACCEPTED`/`REJECTED`/`FAILED_PROBE`), rejection reasons, provenance score and component reasons, and explicit override metadata. Complete format arrays, media direct URLs, cookies, and headers are never persisted.
 - **Source manifest**: each successful source produces `source.json` with source_id, display_url (sanitized), selected_backend, attempt_history (backend/status/error per attempt), local_files, subtitles, thumbnail, sha256, ffprobe_result (format/duration/resolution/codecs), acquisition_timestamp, and a copyright notice. When a candidate exists, its platform, media ID, title, uploader, publish date, duration, search query, provenance score, and story node are populated instead of `null`.
++- **Material assessment**: each material carries three separate states 鈥?`technical_status` (`PASS`/`FAIL`/`UNKNOWN`), `quality_status` (`PASS`/`WARN`/`REJECT`/`UNKNOWN`), and `editorial_status` (`ACCEPT`/`REVIEW_REQUIRED`/`REJECT`/`UNREVIEWED`) 鈥?with per-dimension reason lists, override metadata, and an assessment timestamp. Conservative defaults: technical validation may set `PASS`; quality stays `UNKNOWN` until Issue #43 runs; editorial stays `UNREVIEWED` until human/provenance/visual signals are evaluated. Legacy `verified=true` maps only to technical `PASS`, never to full acceptance.
 - **Routing table** (`download-tools/routing.json`): schema_version=1; entries carry name, patterns (regex list), backends (ordered list limited to yt-dlp/yutto/streamlink/n-m3u8dl-re/gallery-dl), max_retries (1-5), drm_stop. Routes are matched in order; the first hit applies. Editing only allows whitelisted backend names and validated regex.
 
 ## Reports and Handoff
 
-- `COVERAGE_REPORT.md`: total/completed/failed/pending task counts, candidate URLs and status per story node, material list.
-- `HUMAN_EDITOR_HANDOFF.md`: material paths, sources, durations, resolutions; original script; important note — a successful download does not mean the material fits the edit; the human is responsible for clip selection, pacing, narrative fit, and verifying copyright before publication.
+- `COVERAGE_REPORT.md`: total/completed/failed/pending task counts, candidate URLs and status per story node, material list grouped as accepted / needs review / rejected / unassessed with technical, quality, and editorial status and reasons.
+- `HUMAN_EDITOR_HANDOFF.md`: material paths, sources, durations, resolutions, assessment states and reasons, override metadata; original script; important note 鈥?a successful download does not mean the material fits the edit; the human is responsible for clip selection, pacing, narrative fit, and verifying copyright before publication.
 
 Reports refresh automatically after each queue processing round.
 
@@ -157,7 +158,7 @@ The scripts under `skill/mediaharbor/scripts/` are internal compatibility entry 
 |---|---|
 | `locate_root.py` | Print the MediaHarbor root path (3-marker, cwd-independent) |
 | `check_tools.py` | Print tool availability status (READY/DEGRADED) |
-| `orchestrator.py` | Process the task queue (download → validate → hash → source.json → reports) |
+| `orchestrator.py` | Process the task queue (download 鈫?validate 鈫?hash 鈫?source.json 鈫?reports) |
 | `router.py` | Route a URL to backends per routing.json with failover |
 | `probe.py` | **Internal diagnostic entry**: probe URLs with yt-dlp |
 | `download.py` | **Legacy / internal**: single-URL download helper; not part of the normal skill workflow |

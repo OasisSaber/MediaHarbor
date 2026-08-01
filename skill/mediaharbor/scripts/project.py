@@ -64,6 +64,15 @@ class MaterialInfo:
     width: int | None = None
     height: int | None = None
     verified: bool = False
+    technical_status: str | None = None
+    quality_status: str | None = None
+    editorial_status: str | None = None
+    technical_reasons: list[str] = field(default_factory=list)
+    quality_reasons: list[str] = field(default_factory=list)
+    editorial_reasons: list[str] = field(default_factory=list)
+    override_metadata: dict | None = None
+    assessment_timestamp: str | None = None
+    assessment_schema_version: int = 1
 
 
 @dataclass
@@ -224,6 +233,8 @@ def _project_from_dict(data: dict[str, Any]) -> Project:
     candidates = [Candidate(**c) for c in data.get("candidates", [])]
     tasks = [DownloadTask(**t) for t in data.get("tasks", [])]
     materials = [MaterialInfo(**m) for m in data.get("materials", [])]
+    for material in materials:
+        _migrate_material_assessment(material)
     return Project(
         name=data["name"],
         schema_version=data.get("schema_version", 1),
@@ -236,3 +247,17 @@ def _project_from_dict(data: dict[str, Any]) -> Project:
         tasks=tasks,
         materials=materials,
     )
+
+
+def _migrate_material_assessment(material: MaterialInfo) -> None:
+    """Conservatively derive assessment fields for schema-1 projects.
+
+    Legacy ``verified`` maps to technical PASS only; quality and editorial
+    states stay UNKNOWN/UNREVIEWED and never imply acceptance.
+    """
+    if material.technical_status is not None:
+        return
+    material.technical_status = "PASS" if material.verified else "UNKNOWN"
+    material.quality_status = material.quality_status or "UNKNOWN"
+    material.editorial_status = material.editorial_status or "UNREVIEWED"
+    material.assessment_schema_version = 1
