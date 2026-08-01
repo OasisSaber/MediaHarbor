@@ -134,7 +134,7 @@ Classify failures from the return code and merged stdout+stderr, in priority ord
 ## Reports and Handoff
 
 - `COVERAGE_REPORT.md`: total/completed/failed/pending task counts, candidate URLs and status per story node, material list grouped as accepted / needs review / rejected / unassessed with technical, quality, and editorial status and reasons.
-- `HUMAN_EDITOR_HANDOFF.md`: material paths, sources, durations, resolutions, assessment states and reasons, override metadata; original script; important note 鈥?a successful download does not mean the material fits the edit; the human is responsible for clip selection, pacing, narrative fit, and verifying copyright before publication.
+- `HUMAN_EDITOR_HANDOFF.md`: material paths, sources, durations, resolutions, assessment states and reasons, override metadata; story nodes (title/description/search terms and their collected materials); original script; important note — a successful download does not mean the material fits the edit; the human is responsible for clip selection, pacing, narrative fit, and verifying copyright before publication.
 
 Reports refresh automatically after each queue processing round.
 
@@ -156,7 +156,7 @@ The following reliability issues remain open; do not treat them as implemented:
 
 ## Agent-Facing CLI
 
-Run `python mediaharbor.py` from the repository root. Commands: `check-tools`, `project-create <name>`, `candidate-add <project> <url>`, `process <project>`, `status <project>`, and `run --project <name> --url <url>`. All commands output JSON with the fixed top-level fields `ok`, `status`, `data`, `error`. This is the only stable entry point recommended by this skill.
+Run `python mediaharbor.py` from the repository root. Commands: `check-tools`, `project-create <name>`, `story-node-add <project> <title> [--description <text>]`, `story-node-list <project>`, `candidate-add <project> <url>`, `process <project>`, `status <project>`, and `run --project <name> --url <url>`. All commands output JSON with the fixed top-level fields `ok`, `status`, `data`, `error`. This is the only stable entry point recommended by this skill.
 
 ## Internal Entry Points
 

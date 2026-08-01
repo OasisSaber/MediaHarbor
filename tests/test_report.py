@@ -134,6 +134,44 @@ def test_coverage_report_groups_materials_by_editorial_status():
             os.chdir(cwd)
 
 
+def test_handoff_story_notes_show_nodes():
+    from project import MaterialInfo, Project, StoryNode, save_project
+    from report import generate_handoff
+
+    p = Project(
+        name="handoff-story-notes-test",
+        script="原始脚本内容",
+        story_nodes=[
+            StoryNode(
+                title="第3幕-点火升空",
+                description="发射现场素材",
+                candidate_urls=["https://example.com/a"],
+            )
+        ],
+        materials=[
+            MaterialInfo(
+                source_url="https://example.com/a",
+                local_path="a.mp4",
+                verified=True,
+            )
+        ],
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            save_project(p)
+            handoff = generate_handoff("handoff-story-notes-test")
+            assert handoff is not None
+            assert "### 第3幕-点火升空" in handoff
+            assert "发射现场素材" in handoff
+            assert "a.mp4" in handoff
+            assert "https://example.com/a" in handoff
+        finally:
+            os.chdir(cwd)
+
+
 def test_handoff_shows_assessment_states():
     from project import MaterialInfo, Project, save_project
     from report import generate_handoff

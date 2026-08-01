@@ -122,6 +122,21 @@ def generate_handoff(project_name: str) -> str | None:
         lines.append("")
 
     lines.append("## Story Notes")
+    if project.story_nodes:
+        for node in project.story_nodes:
+            lines.append("")
+            lines.append(f"### {node.title}")
+            if node.description:
+                lines.append(node.description)
+            if node.search_terms:
+                lines.append(f"  - Search terms: {', '.join(node.search_terms)}")
+            if node.candidate_urls:
+                for url in node.candidate_urls:
+                    material = next((m for m in project.materials if m.source_url == url), None)
+                    if material:
+                        lines.append(f"  - Material: {material.local_path} ({url})")
+                    else:
+                        lines.append(f"  - No material collected yet: {url}")
     if project.script:
         lines.append("")
         lines.append("### Original Script")

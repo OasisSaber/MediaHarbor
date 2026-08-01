@@ -42,6 +42,7 @@ def _run_cli(cwd: str, *args: str) -> subprocess.CompletedProcess:
         [sys.executable, str(CLI), *args],
         capture_output=True,
         text=True,
+        encoding="utf-8",
         cwd=cwd,
     )
 
@@ -49,6 +50,86 @@ def _run_cli(cwd: str, *args: str) -> subprocess.CompletedProcess:
 def _load_json(result: subprocess.CompletedProcess) -> dict:
     assert result.returncode in (0, 1), f"unexpected exit {result.returncode}: {result.stderr}"
     return json.loads(result.stdout)
+
+
+def test_story_node_add_and_list():
+    project_name = _unique_project("cli-story")
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            _setup_temp_workspace(tmp)
+            result = _run_cli(tmp, "project-create", project_name, "--json")
+            assert _load_json(result)["ok"] is True
+
+            result = _run_cli(
+                tmp,
+                "story-node-add",
+                project_name,
+                "第3幕-点火升空",
+                "--description",
+                "发射现场素材",
+                "--json",
+            )
+            payload = _load_json(result)
+            assert payload["ok"] is True
+            node_id = payload["data"]["node_id"]
+            assert payload["data"]["title"] == "第3幕-点火升空"
+
+            result = _run_cli(tmp, "story-node-list", project_name, "--json")
+            payload = _load_json(result)
+            assert payload["ok"] is True
+            assert payload["data"]["nodes"] == [
+                {
+                    "node_id": node_id,
+                    "title": "第3幕-点火升空",
+                    "description": "发射现场素材",
+                    "search_terms": [],
+                    "candidate_urls": [],
+                }
+            ]
+    finally:
+        _cleanup_project(project_name)
+
+
+def test_story_node_attach_via_candidate_add():
+    project_name = _unique_project("cli-story-attach")
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            _setup_temp_workspace(tmp)
+            assert _load_json(_run_cli(tmp, "project-create", project_name, "--json"))["ok"]
+            assert _load_json(_run_cli(tmp, "story-node-add", project_name, "节点A", "--json"))[
+                "ok"
+            ]
+
+            # probe 在无工具 workspace 失败；override 接受并仍应关联 story node
+            result = _run_cli(
+                tmp,
+                "candidate-add",
+                project_name,
+                "https://example.com/video1",
+                "--node-title",
+                "节点A",
+                "--override",
+                "--json",
+            )
+            payload = _load_json(result)
+            assert payload["ok"] is True
+            assert payload["data"]["state"] == "ACCEPTED"
+
+            # find_project_root 优先命中 REPO_ROOT（__file__ 向上），CLI 项目实际写在
+            # REPO_ROOT/output/ 下（与 _cleanup_project 一致）
+            project_path = REPO_ROOT / "output" / project_name / "project.json"
+            data = json.loads(project_path.read_text(encoding="utf-8"))
+            nodes = data.get("story_nodes", [])
+            assert any(
+                n["title"] == "节点A"
+                and "https://example.com/video1" in n.get("candidate_urls", [])
+                for n in nodes
+            )
+            candidates = data.get("candidates", [])
+            assert candidates and candidates[0]["story_node_title"] == "节点A"
+            assert candidates[0]["state"] == "ACCEPTED"
+    finally:
+        _cleanup_project(project_name)
 
 
 def test_check_tools_output_shape():
