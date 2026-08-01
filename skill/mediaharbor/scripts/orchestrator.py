@@ -39,6 +39,7 @@ from quality import (
 from report import save_handoff, save_report
 from router import download_with_fallback
 from safe_path import resolve_project_dir
+from visual_analysis import LABEL_CLEAN, LABEL_UNAVAILABLE, analyze_media, validate_visual_config
 
 
 def _sha256(file_path: Path) -> str:
@@ -55,6 +56,7 @@ def _build_source_entry(
     result: BackendResult,
     backend: str,
     main_file: Path | None = None,
+    visual_analysis: dict | None = None,
 ) -> dict | None:
     project = load_project(project_name)
     if project is None:
@@ -104,6 +106,7 @@ def _build_source_entry(
         "thumbnail": thumbnail,
         "sha256": None,
         "ffprobe_result": None,
+        "visual_analysis": visual_analysis,
         "acquisition_timestamp": datetime.now(timezone.utc).isoformat(),
         "rights_access_note": "Verify copyright before use.",
         "final_status": "SUCCESS",
@@ -435,12 +438,39 @@ def _process_started_task(
             )
         finalized_paths = list(result.output_paths)
         valid_file = finalized_main[0]
+
+        visual_analysis: dict | None = None
+        editorial_status: str | None = None
+        editorial_reasons: list[str] = []
+        try:
+            visual_config = validate_visual_config(project.visual_config)
+            analysis_dir = project_dir / "assets" / "analysis" / task.task_id
+            visual_analysis = analyze_media(valid_file, analysis_dir, visual_config)
+        except ValueError as error:
+            visual_analysis = {
+                "status": LABEL_UNAVAILABLE,
+                "labels": [],
+                "metrics": {},
+                "ocr_status": "unavailable",
+                "note": f"invalid visual config: {error}",
+            }
+        if visual_analysis and visual_analysis.get("status") != LABEL_CLEAN:
+            editorial_status = "REVIEW_REQUIRED"
+            if visual_analysis.get("status") == LABEL_UNAVAILABLE:
+                editorial_reasons.append("visual-analysis-unavailable")
+            else:
+                for item in visual_analysis.get("labels", []):
+                    editorial_reasons.append(f"visual:{item.get('label')}")
+                if not visual_analysis.get("labels"):
+                    editorial_reasons.append(f"visual:{visual_analysis.get('status')}")
+
         source_entry = _build_source_entry(
             project_name,
             task.url,
             result,
             backend or "",
             main_file=valid_file,
+            visual_analysis=visual_analysis,
         )
         if source_entry is None:
             raise RuntimeError("Failed to generate source.json: project not found")
@@ -470,6 +500,9 @@ def _process_started_task(
             material_hashes={str(path): _sha256(path) for path in finalized_main},
             quality_status=quality_status,
             quality_reasons=quality_reasons,
+            editorial_status=editorial_status,
+            editorial_reasons=editorial_reasons,
+            visual_analysis=visual_analysis,
             **media_fields,
         )
         if completed is None:
