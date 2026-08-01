@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -659,5 +660,143 @@ def test_legacy_sanitized_task_without_execution_url_fails():
             assert result["failed"] == 1
             assert task.status == "FAILED"
             assert task.error is not None
+        finally:
+            os.chdir(cwd)
+
+
+def test_finalize_midway_failure_rolls_back_and_fails_task():
+    from unittest.mock import patch
+
+    from _common import ensure_output_dir
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult, ProcessResult
+    from project import create_project, load_project, save_project
+    from safe_path import resolve_project_dir
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = "finalize-rollback-test"
+            save_project(create_project(project_name))
+            add_candidate(project_name, "https://example.com/live")
+            task_id = load_project(project_name).tasks[0].task_id
+
+            root = ensure_output_dir()
+            project_dir = resolve_project_dir(root, project_name)
+            final_dir = project_dir / "assets" / "originals"
+            final_dir.mkdir(parents=True, exist_ok=True)
+            stale = final_dir / f"{task_id}-stream.ts"
+            stale.write_text("existing material")
+
+            def fake_download(_url, output_dir, runner=None):
+                del runner
+                output_dir.mkdir(parents=True, exist_ok=True)
+                main = output_dir / "stream.ts"
+                subtitle = output_dir / "stream.en.vtt"
+                main.write_text("new media")
+                subtitle.write_text("new subtitle")
+                return BackendResult(status=SUCCESS, output_paths=[main, subtitle]), "streamlink"
+
+            real_move = shutil.move
+            move_calls = {"count": 0}
+
+            def failing_move(src, dst):
+                move_calls["count"] += 1
+                if move_calls["count"] == 2:
+                    raise OSError("simulated move failure on second file")
+                return real_move(src, dst)
+
+            with (
+                patch("orchestrator.download_with_fallback", side_effect=fake_download),
+                patch("orchestrator._validate_downloaded_file") as mock_validate,
+                patch("orchestrator.shutil.move", side_effect=failing_move),
+            ):
+                mock_validate.return_value = ProcessResult(
+                    returncode=0,
+                    stdout="validated",
+                    stderr="",
+                    status=SUCCESS,
+                )
+                result = process_pending(project_name)
+
+            assert result["failed"] == 1
+            task = load_project(project_name).tasks[0]
+            assert task.status == "FAILED"
+            assert "FINALIZATION_FAILED" in task.error
+            assert stale.read_text() == "existing material"
+            names = {p.name for p in final_dir.iterdir()}
+            assert f"{task_id}-stream.ts" in names
+            assert f"{task_id}-2-stream.ts" not in names
+            assert f"{task_id}-stream.en.vtt" not in names
+        finally:
+            os.chdir(cwd)
+
+
+def test_finalize_rollback_failure_removes_partial_files():
+    from unittest.mock import patch
+
+    from _common import ensure_output_dir
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult, ProcessResult
+    from project import create_project, load_project, save_project
+    from safe_path import resolve_project_dir
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = "finalize-rollback-fail-test"
+            save_project(create_project(project_name))
+            add_candidate(project_name, "https://example.com/live")
+            task_id = load_project(project_name).tasks[0].task_id
+
+            root = ensure_output_dir()
+            project_dir = resolve_project_dir(root, project_name)
+            final_dir = project_dir / "assets" / "originals"
+            final_dir.mkdir(parents=True, exist_ok=True)
+
+            def fake_download(_url, output_dir, runner=None):
+                del runner
+                output_dir.mkdir(parents=True, exist_ok=True)
+                main = output_dir / "stream.ts"
+                subtitle = output_dir / "stream.en.vtt"
+                main.write_text("new media")
+                subtitle.write_text("new subtitle")
+                return BackendResult(status=SUCCESS, output_paths=[main, subtitle]), "streamlink"
+
+            real_move = shutil.move
+            move_calls = {"count": 0}
+
+            def move_then_always_fail(src, dst):
+                move_calls["count"] += 1
+                if move_calls["count"] == 1:
+                    return real_move(src, dst)
+                raise OSError("simulated persistent move failure")
+
+            with (
+                patch("orchestrator.download_with_fallback", side_effect=fake_download),
+                patch("orchestrator._validate_downloaded_file") as mock_validate,
+                patch("orchestrator.shutil.move", side_effect=move_then_always_fail),
+            ):
+                mock_validate.return_value = ProcessResult(
+                    returncode=0,
+                    stdout="validated",
+                    stderr="",
+                    status=SUCCESS,
+                )
+                result = process_pending(project_name)
+
+            assert result["failed"] == 1
+            task = load_project(project_name).tasks[0]
+            assert task.status == "FAILED"
+            assert "FINALIZATION_FAILED" in task.error
+            assert "rollback was incomplete" in task.error
+            names = {p.name for p in final_dir.iterdir()}
+            assert not any(name.startswith(task_id) for name in names)
         finally:
             os.chdir(cwd)
