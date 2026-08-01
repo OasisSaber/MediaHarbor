@@ -107,8 +107,8 @@ def test_fallback_backends_use_isolated_attempt_directories(tmp_path, monkeypatc
     )
     attempt_dirs = []
 
-    def fake_execute(backend_name, _url, output_dir, runner=None):
-        del runner
+    def fake_execute(backend_name, _url, output_dir, runner=None, max_attempts=None):
+        del runner, max_attempts
         attempt_dirs.append(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         if backend_name == "yt-dlp":
@@ -133,3 +133,99 @@ def test_fallback_backends_use_isolated_attempt_directories(tmp_path, monkeypatc
     assert attempt_dirs[0] != attempt_dirs[1]
     assert all(path.parent == tmp_path for path in attempt_dirs)
     assert result.output_paths == [attempt_dirs[1] / "stream.ts"]
+
+
+def test_global_attempt_budget_never_exceeded(tmp_path, monkeypatch):
+    import router
+    from process_runner import MAX_TOTAL_ATTEMPTS, AttemptInfo
+
+    route = RouteEntry(
+        name="budget",
+        patterns=[r"example\.com"],
+        backends=["yt-dlp", "streamlink", "gallery-dl"],
+        max_retries=5,
+    )
+    observed = []
+
+    def fake_execute(backend_name, _url, output_dir, runner=None, max_attempts=None):
+        del runner, output_dir
+        observed.append((backend_name, max_attempts))
+        attempts = [
+            AttemptInfo(n, backend_name, "DOWNLOAD_FAILED", 1, 0.1, True, "fail")
+            for n in range(1, max_attempts + 1)
+        ]
+        return BackendResult(status="DOWNLOAD_FAILED", attempts=attempts)
+
+    monkeypatch.setattr(router, "execute_backend", fake_execute)
+    monkeypatch.setattr(router, "probe_and_resolve_live", lambda *_args, **_kwargs: (None, None))
+
+    result, _backend = download_with_fallback(
+        "https://example.com/video",
+        tmp_path,
+        routes=[route],
+    )
+
+    total = len(result.attempts)
+    assert total <= MAX_TOTAL_ATTEMPTS
+    assert len(observed) == 2
+    assert observed[0][1] == 5
+    assert observed[1][1] == 1
+    assert result.status == "RATE_LIMITED"
+
+
+def test_fallback_succeeds_after_first_backend_fails(tmp_path, monkeypatch):
+    import router
+
+    route = RouteEntry(
+        name="failover",
+        patterns=[r"example\.com"],
+        backends=["yt-dlp", "streamlink"],
+        max_retries=1,
+    )
+
+    def fake_execute(backend_name, _url, output_dir, runner=None, max_attempts=None):
+        del runner, max_attempts
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if backend_name == "yt-dlp":
+            return BackendResult(status="DOWNLOAD_FAILED")
+        completed = output_dir / "stream.ts"
+        completed.write_text("complete")
+        return BackendResult(status="SUCCESS", output_paths=[completed])
+
+    monkeypatch.setattr(router, "execute_backend", fake_execute)
+    monkeypatch.setattr(router, "probe_and_resolve_live", lambda *_args, **_kwargs: (None, None))
+
+    result, backend = download_with_fallback(
+        "https://example.com/live",
+        tmp_path,
+        routes=[route],
+    )
+    assert result.status == "SUCCESS"
+    assert backend == "streamlink"
+
+
+def test_all_backends_fail_returns_last_error(tmp_path, monkeypatch):
+    import router
+
+    route = RouteEntry(
+        name="all-fail",
+        patterns=[r"example\.com"],
+        backends=["yt-dlp", "streamlink"],
+        max_retries=1,
+    )
+
+    def fake_execute(backend_name, _url, output_dir, runner=None, max_attempts=None):
+        del runner, max_attempts, output_dir
+        return BackendResult(status="DOWNLOAD_FAILED", stderr=f"{backend_name} failed")
+
+    monkeypatch.setattr(router, "execute_backend", fake_execute)
+    monkeypatch.setattr(router, "probe_and_resolve_live", lambda *_args, **_kwargs: (None, None))
+
+    result, backend = download_with_fallback(
+        "https://example.com/video",
+        tmp_path,
+        routes=[route],
+    )
+    assert result.status == "DOWNLOAD_FAILED"
+    assert backend == "streamlink"
+    assert "streamlink failed" in result.stderr

@@ -6,6 +6,7 @@ from typing import Any
 
 from _common import find_project_root, resolve_registered_tool
 from process_runner import (
+    PROBE_TIMEOUT,
     SUCCESS,
     BackendResult,
     ProcessResult,
@@ -60,8 +61,8 @@ def build_download_args(url: str, output_dir: Path) -> list[str]:
 
 
 def probe_url(url: str, runner: ProcessRunner | None = None) -> ProcessResult:
-    if runner is None:
-        runner = ProcessRunner()
+    if runner is None or runner.timeout > PROBE_TIMEOUT:
+        runner = ProcessRunner(timeout=PROBE_TIMEOUT)
     yt_path = resolve_ytdlp()
     if yt_path is None:
         return ProcessResult(
@@ -137,6 +138,7 @@ def download_url(
     output_dir: Path,
     runner: ProcessRunner | None = None,
     allow_system_path: bool = False,
+    max_attempts: int | None = None,
 ) -> BackendResult:
     if runner is None:
         runner = ProcessRunner(timeout=DOWNLOAD_TIMEOUT, max_retries=2)
@@ -149,7 +151,7 @@ def download_url(
     output_dir.mkdir(parents=True, exist_ok=True)
     before = snapshot_output_files(output_dir)
     cmd = [str(yt_path)] + build_download_args(url, output_dir)
-    result = runner.run(cmd, check_drm=True, backend="yt-dlp")
+    result = runner.run(cmd, check_drm=True, backend="yt-dlp", max_attempts=max_attempts)
     return _convert_to_backend_result(result, output_dir, before)
 
 

@@ -118,3 +118,63 @@ def test_discover_output_files_in_nested_backend_directory(tmp_path):
     nested.write_text("media")
 
     assert discover_output_files(tmp_path, before) == [nested]
+
+
+def test_max_attempts_caps_executions():
+    runner = ProcessRunner(max_retries=5)
+    result = runner.run(
+        [sys.executable, "-c", "exit(1)"],
+        max_attempts=2,
+    )
+    assert len(result.attempts) == 2
+    assert all(a.status == "DOWNLOAD_FAILED" for a in result.attempts)
+
+
+def test_max_attempts_one_allows_single_execution():
+    runner = ProcessRunner(max_retries=5)
+    result = runner.run(
+        [sys.executable, "-c", "exit(1)"],
+        max_attempts=1,
+    )
+    assert len(result.attempts) == 1
+
+
+def test_retryable_failures_apply_injected_backoff():
+    delays = []
+
+    def recording_backoff(delay: float) -> None:
+        delays.append(delay)
+
+    runner = ProcessRunner(max_retries=3, backoff=recording_backoff)
+    result = runner.run([sys.executable, "-c", "exit(1)"])
+    assert result.returncode == 1
+    assert len(result.attempts) == 3
+    assert len(delays) == 2
+    assert delays[0] <= delays[1]
+    assert all(d > 0 for d in delays)
+
+
+def test_terminal_status_no_backoff():
+    delays = []
+
+    def recording_backoff(delay: float) -> None:
+        delays.append(delay)
+
+    runner = ProcessRunner(max_retries=3, backoff=recording_backoff)
+    result = runner.run(
+        [sys.executable, "-c", "import sys; sys.stderr.write('Widevine DRM'); exit(1)"]
+    )
+    assert result.status == "DRM_DETECTED"
+    assert len(result.attempts) == 1
+    assert delays == []
+
+
+def test_invalid_utf8_output_does_not_crash():
+    runner = ProcessRunner()
+    script = (
+        "import sys; sys.stdout.buffer.write(b'\\xff\\xfe broken bytes'); "
+        "sys.stdout.buffer.flush(); exit(0)"
+    )
+    result = runner.run([sys.executable, "-c", script])
+    assert result.status == "SUCCESS"
+    assert "\\ufffd" in result.stdout or "broken" in result.stdout

@@ -28,7 +28,10 @@ def resolve_streamlink(allow_system_path: bool = False) -> Path | None:
 
 
 def run_streamlink(
-    url: str, output_dir: Path, runner: ProcessRunner | None = None
+    url: str,
+    output_dir: Path,
+    runner: ProcessRunner | None = None,
+    max_attempts: int | None = None,
 ) -> BackendResult:
     if runner is None:
         runner = ProcessRunner()
@@ -41,6 +44,6 @@ def run_streamlink(
     output_dir.mkdir(parents=True, exist_ok=True)
     before = snapshot_output_files(output_dir)
     cmd = [str(tool), url, "best", "-o", str(output_dir / "stream.ts")]
-    result = runner.run(cmd, backend="streamlink", check_drm=True)
+    result = runner.run(cmd, backend="streamlink", check_drm=True, max_attempts=max_attempts)
     output_paths = discover_output_files(output_dir, before) if result.status == SUCCESS else []
     return BackendResult.from_process(result, output_paths)
