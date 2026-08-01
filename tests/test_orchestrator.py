@@ -800,3 +800,65 @@ def test_finalize_rollback_failure_removes_partial_files():
             assert not any(name.startswith(task_id) for name in names)
         finally:
             os.chdir(cwd)
+
+
+def test_completed_task_survives_source_commit_failure():
+    from unittest.mock import patch
+
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult, ProcessResult
+    from project import create_project, load_project, project_dir, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"source-commit-failure-{Path(tmp).name}"
+            url = "https://example.com/commit-late-failure"
+            save_project(create_project(project_name))
+            add_candidate(project_name, url)
+            task_id = load_project(project_name).tasks[0].task_id
+
+            def fake_download(_url, output_dir, runner=None):
+                del runner
+                media = output_dir / "video.mp4"
+                media.write_text("media")
+                return BackendResult(status=SUCCESS, output_paths=[media]), "yt-dlp"
+
+            with (
+                patch("orchestrator.download_with_fallback", side_effect=fake_download),
+                patch("orchestrator._validate_downloaded_file") as validation,
+                patch(
+                    "orchestrator._commit_source_transaction",
+                    side_effect=OSError("injected source commit failure"),
+                ),
+            ):
+                validation.return_value = ProcessResult(
+                    returncode=0,
+                    stdout="validated",
+                    stderr="",
+                    status=SUCCESS,
+                )
+                result = process_pending(project_name)
+
+            project = load_project(project_name)
+            task = project.tasks[0]
+            assert result["success"] == 1
+            assert result["failed"] == 0
+            assert task.status == "COMPLETED"
+            assert len(project.materials) == 1
+            assert result["details"][0]["source_pending"] is True
+            assert result["details"][0]["source_pending_error"]
+
+            source_dir = project_dir(project_name) / "acquisition" / "sources"
+            pending = source_dir / f"{task_id}.source.pending"
+            assert pending.is_file()
+
+            recovered = process_pending(project_name)
+            assert recovered["source_transactions_recovered"] == 1
+            assert not pending.exists()
+            assert list(source_dir.glob("*.json"))
+        finally:
+            os.chdir(cwd)
