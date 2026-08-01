@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "platform": "windows-x64",
+  "release_base_url": "https://github.com/OasisSaber/MediaHarbor/releases/download/tools-windows-x64-v1",
+  "tools": {
+    "yt-dlp": {
+      "kind": "zip",
+      "version": "2026.07.04",
+      "archive": "yt-dlp-2026.07.04-win64.zip",
+      "sha256": "189e1d6924d9ef92b0c3e36b143469f48a491758c5d6e975751f8128a0558ae8",
+      "license": "Unlicense",
+      "upstream": "https://github.com/yt-dlp/yt-dlp",
+      "provides": ["yt-dlp/yt-dlp.exe"]
+    },
+    "ffmpeg": {
+      "kind": "zip",
+      "version": "n8.1.2-34-g9b6c8969e0 (2026-07-31 build)",
+      "archive": "ffmpeg-n8.1.2-win64-lgpl.zip",
+      "sha256": "411340f90a794dcfdd52e8228f4ecc34c052edc1766d27c84adff1c0446d68bf",
+      "license": "LGPL-2.1+",
+      "upstream": "https://github.com/BtbN/FFmpeg-Builds",
+      "provides": ["ffmpeg/ffmpeg.exe", "ffmpeg/ffprobe.exe"]
+    },
+    "n-m3u8dl-re": {
+      "kind": "zip",
+      "version": "v0.6.0-beta (df70f0b)",
+      "archive": "N_m3u8DL-RE-v0.6.0-beta-win64.zip",
+      "sha256": "693bfa6738e48c686cc9e1ccdb8b16091903ff1a63c2f0bf495339f4e766d699",
+      "license": "MIT",
+      "upstream": "https://github.com/nilaoda/N_m3u8DL-RE",
+      "provides": ["N_m3u8DL-RE/N_m3u8DL-RE.exe"]
+    },
+    "yutto": {
+      "kind": "pip",
+      "version": "2.2.0",
+      "package": "yutto",
+      "license": "GPL-3.0",
+      "upstream": "https://github.com/yutto-dev/yutto"
+    },
+    "streamlink": {
+      "kind": "pip",
+      "version": "8.4.0",
+      "package": "streamlink",
+      "license": "BSD-2-Clause",
+      "upstream": "https://github.com/streamlink/streamlink"
+    },
+    "gallery-dl": {
+      "kind": "pip",
+      "version": "1.32.8",
+      "package": "gallery-dl",
+      "license": "GPL-2.0",
+      "upstream": "https://github.com/mikf/gallery-dl"
+    }
+  }
+}
