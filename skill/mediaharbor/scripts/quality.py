@@ -121,10 +121,10 @@ def build_format_selector(profile: dict[str, Any]) -> str:
         filters.append(f"vbr>={int(minimum_bitrate)}")
     if not filters:
         return "bv*+ba/b"
-    suffix = ",".join(filters)
+    suffix = "".join(f"[{item}]" for item in filters)
     if profile.get("allow_below_minimum"):
-        return f"bv*[{suffix}]/b"
-    return f"bv*[{suffix}]+ba/b"
+        return f"bv*{suffix}/b"
+    return f"bv*{suffix}+ba/b"
 
 
 def evaluate_media_fields(

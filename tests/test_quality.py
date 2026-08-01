@@ -62,7 +62,7 @@ def test_evaluate_format_summary_info_unavailable():
 
 
 def test_build_format_selector():
-    assert build_format_selector(default_quality_profile()) == "bv*[height>=720,fps>=24]+ba/b"
+    assert build_format_selector(default_quality_profile()) == "bv*[height>=720][fps>=24]+ba/b"
     assert (
         build_format_selector(
             {"minimum_height": None, "minimum_fps": None, "minimum_video_bitrate": None}
@@ -71,7 +71,7 @@ def test_build_format_selector():
     )
     below = default_quality_profile()
     below["allow_below_minimum"] = True
-    assert build_format_selector(below) == "bv*[height>=720,fps>=24]/b"
+    assert build_format_selector(below) == "bv*[height>=720][fps>=24]/b"
 
 
 def test_evaluate_media_fields():

@@ -141,7 +141,7 @@ def classify_output_files(paths: list[Path]) -> dict[str, list[str]]:
             media_types["subtitle"].append(str(path))
         elif name.endswith((".jpg", ".jpeg", ".png", ".webp")):
             media_types["thumbnail"].append(str(path))
-        elif name.endswith((".info.json", ".nfo")):
+        elif name.endswith((".info.json", ".nfo")) or name.endswith(".danmaku.xml"):
             media_types["info_json"].append(str(path))
         else:
             media_types["main"].append(str(path))
