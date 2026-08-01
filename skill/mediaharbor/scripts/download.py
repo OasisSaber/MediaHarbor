@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Legacy / internal entry point.
+# Kept until Issue #29 (unified agent-facing CLI) replaces it. Not part of the
+# normal skill workflow; prefer the acquisition project workflow (orchestrator).
 from __future__ import annotations
 
 import argparse
