@@ -76,3 +76,22 @@ jobs:
 
       - name: PowerShell validation
         run: powershell -ExecutionPolicy Bypass -File scripts/validate.ps1
+
+  manifest-tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Validates tools-manifest.json structure always; once the
+      # tools-windows-x64-v1 release exists, also cross-checks the manifest
+      # sha256 values against the published SHA256SUMS.txt asset.
+      - name: Verify tools manifest
+        run: python scripts/fetch_tools.py --verify-manifest
+

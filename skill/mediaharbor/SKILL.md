@@ -14,7 +14,7 @@ The human provides an existing script or text and asks to find matching video ma
 - MediaHarbor is a **local, single-user, Windows x64 first** agent-skill source repository. Current official platform: **Windows x64 only**.
 - Runtime requirements: Windows x64, **Python 3.11+**, and local third-party tools configured per `download-tools/tools.json`.
 - Deployment: clone the whole repository into the agent workspace (no pip install, no build step).
-- Obtain third-party download tools separately and place them under `download-tools/<tool>/` exactly as declared in `download-tools/tools.json` (e.g. `download-tools/yt-dlp/yt-dlp.exe`). MediaHarbor never downloads, installs, or upgrades tools.
+- Tools: verified open-source tools are distributed as zip assets of the MediaHarbor GitHub Release (`tools-windows-x64-v1`) and fetched with `python scripts/fetch_tools.py` on first use. The script downloads each zip from the project release, verifies its sha256 against `tools-manifest.json`, and extracts it directly into `download-tools/` (e.g. `download-tools/yt-dlp/yt-dlp.exe`). Tools without an official standalone Windows binary (yutto, streamlink, gallery-dl) are not shipped as assets; the script prints their pip installation guidance. MediaHarbor core never downloads tools implicitly at runtime.
 - The stable agent-facing CLI is `python mediaharbor.py` from the repository root (see "Agent-Facing CLI"). Internal scripts under `skill/mediaharbor/scripts/` are compatibility/internal entry points, not a public API.
 
 ## Roles
@@ -71,7 +71,13 @@ Before downloading, run:
 python skill/mediaharbor/scripts/check_tools.py --json
 ```
 
-Returns `READY`, `DEGRADED`, or missing tool status.
+Returns `READY`, `DEGRADED`, or missing tool status. On first use, install the tools first:
+
+```bash
+python scripts/fetch_tools.py
+```
+
+This fetches the verified tool zips from the project release into `download-tools/` and prints a final `check_tools` status. Use `python scripts/fetch_tools.py --check` to report status without downloading, and `--check-updates` to query upstream latest versions. Tools without an official standalone Windows binary (yutto, streamlink, gallery-dl) are not shipped as assets; run `python scripts/fetch_tools.py --tool <name>` for their pip installation guidance. See `docs/tool-update-process.md` for the update workflow.
 
 Required tools: yt-dlp (probe/VOD/subtitles/metadata), ffmpeg (merge/convert), ffprobe (validation).
 Optional tools: yutto (Bilibili), streamlink (live), N_m3u8DL-RE (HLS/DASH/MSS), gallery-dl (social/galleries).

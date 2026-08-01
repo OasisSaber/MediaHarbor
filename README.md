@@ -12,8 +12,10 @@ MediaHarbor 是一个本地、单用户、Windows x64 优先的 Agent Skill 源�
 ## 部署
 
 1. 将整个仓库克隆到 Agent 工作区。
-2. 按 [`download-tools/tools.json`](download-tools/tools.json) 的声明，把第三方下载工具放入对应子目录（如 `download-tools/yt-dlp/yt-dlp.exe`）。MediaHarbor 不自动下载、安装或升级工具。
-3. 无需 `pip install`，直接运行 `skill/mediaharbor/scripts/` 下的脚本。
+2. 运行 `python scripts/fetch_tools.py` 从项目 Release 获取已验证工具（下载 → sha256 校验 → 解压到 `download-tools/`）。也可 `python scripts/fetch_tools.py --check` 查看状态、`--check-updates` 查询上游新版本。
+3. 无需 `pip install`，直接运行 `skill/mediaharbor/scripts/` 下的脚本或 `python mediaharbor.py`。
+
+工具清单与哈希见 [`tools-manifest.json`](tools-manifest.json)；工具更新流程见 [`docs/tool-update-process.md`](docs/tool-update-process.md)。无官方独立 Windows 二进制的工具（yutto / streamlink / gallery-dl）不作为发布资产，按 fetch 脚本指引 pip 安装。
 
 ## Agent 入口
 
