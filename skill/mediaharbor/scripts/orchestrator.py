@@ -236,6 +236,10 @@ def _prepare_task_staging(project_dir: Path, task_id: str) -> Path:
     return task_dir
 
 
+class ArtifactFinalizationError(RuntimeError):
+    """Raised when multi-file finalization fails partway and rollback was attempted."""
+
+
 def _final_destination(final_dir: Path, task_id: str, source: Path) -> Path:
     destination = final_dir / f"{task_id}-{source.name}"
     counter = 2
@@ -254,12 +258,33 @@ def _finalize_artifacts(
     staging_root = staging_dir.resolve()
     final_dir.mkdir(parents=True, exist_ok=True)
     moved: dict[Path, Path] = {}
-    for source in result.output_paths:
-        resolved = source.resolve()
-        resolved.relative_to(staging_root)
-        destination = _final_destination(final_dir, task_id, source)
-        shutil.move(str(source), str(destination))
-        moved[resolved] = destination
+    try:
+        for source in result.output_paths:
+            resolved = source.resolve()
+            resolved.relative_to(staging_root)
+            destination = _final_destination(final_dir, task_id, source)
+            shutil.move(str(source), str(destination))
+            moved[resolved] = destination
+    except Exception as error:
+        diagnostics: list[str] = []
+        for resolved, destination in moved.items():
+            try:
+                shutil.move(str(destination), str(resolved))
+            except Exception as rb_error:
+                try:
+                    destination.unlink(missing_ok=True)
+                except OSError as unlink_error:
+                    diagnostics.append(f"cannot restore or remove {destination}: {unlink_error}")
+                else:
+                    diagnostics.append(f"removed partial final file {destination}: {rb_error}")
+        if diagnostics:
+            raise ArtifactFinalizationError(
+                "Finalization failed partway and rollback was incomplete: "
+                + f"{error} | {diagnostics}"
+            ) from error
+        raise ArtifactFinalizationError(
+            f"Finalization failed partway and was rolled back: {error}"
+        ) from error
 
     result.output_paths = [moved[path.resolve()] for path in result.output_paths]
     media_types = result.metadata.get("media_types", {})
@@ -336,12 +361,20 @@ def _process_started_task(
                 "VALIDATION_FAILED: invalid media",
             )
 
-        result, finalized_main = _finalize_artifacts(
-            result,
-            staging_dir,
-            final_dir,
-            task.task_id,
-        )
+        try:
+            result, finalized_main = _finalize_artifacts(
+                result,
+                staging_dir,
+                final_dir,
+                task.task_id,
+            )
+        except ArtifactFinalizationError as error:
+            return _fail_started_task(
+                project_name,
+                task.url,
+                entry,
+                f"FINALIZATION_FAILED: {sanitize_stderr(str(error))[:200]}",
+            )
         finalized_paths = list(result.output_paths)
         valid_file = finalized_main[0]
         source_entry = _build_source_entry(
