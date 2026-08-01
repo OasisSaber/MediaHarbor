@@ -160,29 +160,30 @@ def execute_backend(
     url: str,
     output_dir: Path,
     runner: ProcessRunner | None = None,
+    max_attempts: int | None = None,
 ) -> BackendResult:
     if runner is None:
         runner = ProcessRunner()
     if backend_name == "yt-dlp":
         from ytdlp_adapter import download_url
 
-        return download_url(url, output_dir, runner=runner)
+        return download_url(url, output_dir, runner=runner, max_attempts=max_attempts)
     if backend_name == "yutto":
         from backends.yutto import run_yutto
 
-        return run_yutto(url, output_dir, runner=runner)
+        return run_yutto(url, output_dir, runner=runner, max_attempts=max_attempts)
     if backend_name == "streamlink":
         from backends.streamlink import run_streamlink
 
-        return run_streamlink(url, output_dir, runner=runner)
+        return run_streamlink(url, output_dir, runner=runner, max_attempts=max_attempts)
     if backend_name == "n-m3u8dl-re":
         from backends.n_m3u8dl_re import run_n_m3u8dl_re
 
-        return run_n_m3u8dl_re(url, output_dir, runner=runner)
+        return run_n_m3u8dl_re(url, output_dir, runner=runner, max_attempts=max_attempts)
     if backend_name == "gallery-dl":
         from backends.gallery_dl import run_gallery_dl
 
-        return run_gallery_dl(url, output_dir, runner=runner)
+        return run_gallery_dl(url, output_dir, runner=runner, max_attempts=max_attempts)
     return BackendResult(
         status="UNSUPPORTED_URL",
         stderr=f"Unknown backend: {backend_name}",
@@ -236,12 +237,16 @@ def download_with_fallback(
             break
         if runner is None:
             runner = ProcessRunner()
-        saved_retries = runner.max_retries
-        runner.max_retries = route.max_retries
         attempt_dir = output_dir / f"{backend_index:02d}-{backend_name}"
         attempt_dir.mkdir(parents=True, exist_ok=True)
-        result = execute_backend(backend_name, url, attempt_dir, runner=runner)
-        runner.max_retries = saved_retries
+        remaining = MAX_TOTAL_ATTEMPTS - total_attempts
+        result = execute_backend(
+            backend_name,
+            url,
+            attempt_dir,
+            runner=runner,
+            max_attempts=min(route.max_retries, remaining),
+        )
         all_attempts.extend(result.attempts)
         total_attempts += len(result.attempts)
         last_result = result

@@ -5,7 +5,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 PROBE_TIMEOUT = 30
@@ -13,6 +13,8 @@ DOWNLOAD_TIMEOUT = 600
 MAX_RETRIES = 3
 MAX_TOTAL_ATTEMPTS = 6
 MAX_BACKEND_STDERR = 2000
+BACKOFF_BASE = 1.0
+BACKOFF_MAX = 8.0
 
 TOOL_STATUSES = {"READY", "DEGRADED", "MISSING"}
 SUCCESS = "SUCCESS"
@@ -203,9 +205,15 @@ def sanitize_stdout(stdout: str) -> str:
 
 
 class ProcessRunner:
-    def __init__(self, timeout: int = PROBE_TIMEOUT, max_retries: int = MAX_RETRIES):
+    def __init__(
+        self,
+        timeout: int = PROBE_TIMEOUT,
+        max_retries: int = MAX_RETRIES,
+        backoff: Callable[[float], None] | None = None,
+    ):
         self.timeout = timeout
         self.max_retries = max_retries
+        self.backoff = backoff if backoff is not None else time.sleep
 
     def run(
         self,
@@ -213,11 +221,15 @@ class ProcessRunner:
         check_drm: bool = True,
         backend: str | None = None,
         allow_system_path: bool = False,
+        max_attempts: int | None = None,
     ) -> ProcessResult:
         attempts: list[AttemptInfo] = []
         last_result = ProcessResult(returncode=-1, stdout="", stderr="", status="INTERNAL_ERROR")
+        attempt_cap = self.max_retries
+        if max_attempts is not None:
+            attempt_cap = min(attempt_cap, max(1, max_attempts))
 
-        for attempt_num in range(1, self.max_retries + 1):
+        for attempt_num in range(1, attempt_cap + 1):
             result = self._run_once(cmd, check_drm)
             result.stdout = sanitize_stdout(result.stdout)
             result.stderr = sanitize_stderr(result.stderr)
@@ -244,6 +256,9 @@ class ProcessRunner:
             if result.status not in RETRYABLE_STATUSES:
                 return last_result
 
+            if attempt_num < attempt_cap:
+                self.backoff(min(BACKOFF_BASE * (2 ** (attempt_num - 1)), BACKOFF_MAX))
+
         return last_result
 
     def _run_once(self, cmd: Sequence[str], check_drm: bool) -> ProcessResult:
@@ -261,6 +276,8 @@ class ProcessRunner:
                 cmd,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=self.timeout,
                 check=False,
             )
