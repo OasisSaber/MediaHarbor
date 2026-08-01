@@ -207,6 +207,58 @@ def test_sanitized_url_persisted():
             assert r.tasks[0].url != url_with_token
             assert "REDACTED" in r.tasks[0].url
             assert "hello" in r.tasks[0].url
+            assert r.tasks[0].execution_url == url_with_token
+        finally:
+            os.chdir(cwd)
+
+
+def test_execution_url_preserved_for_signed_url():
+    from acquisition import add_candidate
+    from project import create_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("signed-url-test")
+            save_project(p)
+            signed = (
+                "https://example.com/video?id=123&signature=abc123&expires=9999999999&"
+                "X-Amz-Credential=credential-value"
+            )
+            r = add_candidate("signed-url-test", signed)
+            assert r is not None
+            task = r.tasks[0]
+            assert task.execution_url == signed
+            assert task.url != signed
+            assert "REDACTED" in task.url
+            assert "abc123" not in task.url
+            assert "credential-value" not in task.url
+        finally:
+            os.chdir(cwd)
+
+
+def test_display_url_truncates_long_non_sensitive_params():
+    from acquisition import add_candidate
+    from project import create_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("long-param-test")
+            save_project(p)
+            long_value = "a" * 500
+            url = f"https://example.com/v?cursor={long_value}&id=1"
+            r = add_candidate("long-param-test", url)
+            assert r is not None
+            display = r.tasks[0].url
+            assert display.startswith("https://example.com/v?")
+            assert "cursor" in display
+            assert len(display) < len(url)
+            assert r.tasks[0].execution_url == url
         finally:
             os.chdir(cwd)
 

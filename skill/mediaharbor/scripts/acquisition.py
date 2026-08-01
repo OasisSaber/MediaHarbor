@@ -28,7 +28,7 @@ def add_candidate(project_name: str, url: str, node_title: str = "") -> Project 
                 if display_url not in node.candidate_urls:
                     node.candidate_urls.append(display_url)
                 break
-    task = DownloadTask(url=display_url, status="PENDING")
+    task = DownloadTask(url=display_url, execution_url=url, status="PENDING")
     project.tasks.append(task)
     save_project(project)
     return project

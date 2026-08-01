@@ -68,6 +68,8 @@ URL_REDACTION_RE = re.compile(
     r"(token|key|secret|auth|session|pass|sign|sig)=[^&\s]*", re.IGNORECASE
 )
 
+MAX_DISPLAY_PARAM_LENGTH = 128
+
 
 @dataclass
 class AttemptInfo:
@@ -180,7 +182,12 @@ def sanitize_url(url: str) -> str:
             ):
                 cleaned[key] = ["REDACTED"]
             else:
-                cleaned[key] = values
+                cleaned[key] = [
+                    value
+                    if len(value) <= MAX_DISPLAY_PARAM_LENGTH
+                    else f"{value[:MAX_DISPLAY_PARAM_LENGTH]}..."
+                    for value in values
+                ]
         new_query = urlencode(cleaned, doseq=True)
         return urlunparse(parsed._replace(query=new_query))
     except Exception:

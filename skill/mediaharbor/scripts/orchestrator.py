@@ -300,7 +300,8 @@ def _process_started_task(
     project_committed = False
 
     try:
-        result, backend = download_with_fallback(task.url, staging_dir, runner=runner)
+        exec_url = task.execution_url or task.url
+        result, backend = download_with_fallback(exec_url, staging_dir, runner=runner)
         entry = {"url": task.url, "backend": backend, "status": result.status}
         if result.status != SUCCESS:
             return _fail_started_task(
@@ -414,7 +415,8 @@ def process_pending(project_name: str, runner: ProcessRunner | None = None) -> d
     }
 
     for task in pending:
-        if "REDACTED" in task.url:
+        exec_url = task.execution_url or task.url
+        if "REDACTED" in exec_url:
             started = start_task(project_name, task.url)
             if started is None:
                 continue
@@ -423,7 +425,7 @@ def process_pending(project_name: str, runner: ProcessRunner | None = None) -> d
                 project_name,
                 task.url,
                 {"url": task.url, "backend": None, "status": "VALIDATION_FAILED"},
-                "Cannot download a sanitized URL without its raw runtime value",
+                "Cannot download a task without a raw execution URL (display URL is sanitized)",
             )
             results["failed"] += 1
             results["details"].append(entry)

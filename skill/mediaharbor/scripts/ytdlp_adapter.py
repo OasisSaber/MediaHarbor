@@ -71,6 +71,18 @@ def probe_url(url: str, runner: ProcessRunner | None = None) -> ProcessResult:
     return runner.run(cmd, check_drm=True, backend="yt-dlp")
 
 
+def _summarize_formats(formats: list[dict[str, Any]]) -> dict[str, Any]:
+    heights = [f["height"] for f in formats if isinstance(f.get("height"), int)]
+    fps = [f["fps"] for f in formats if isinstance(f.get("fps"), int)]
+    bitrates = [f["tbr"] for f in formats if isinstance(f.get("tbr"), (int, float))]
+    return {
+        "count": len(formats),
+        "max_height": max(heights) if heights else None,
+        "max_fps": max(fps) if fps else None,
+        "max_bitrate": max(bitrates) if bitrates else None,
+    }
+
+
 def parse_probe_json(output: str) -> dict[str, Any] | None:
     if not output.strip():
         return None
@@ -86,12 +98,13 @@ def parse_probe_json(output: str) -> dict[str, Any] | None:
             "extractor",
             "is_live",
             "live_status",
-            "formats",
         ):
             if key in data:
                 result[key] = data[key]
         if "webpage_url" in result:
             result["webpage_url"] = sanitize_url(result["webpage_url"])
+        if isinstance(data.get("formats"), list):
+            result["formats_summary"] = _summarize_formats(data["formats"])
         return result
     except (json.JSONDecodeError, IndexError):
         return None

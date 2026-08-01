@@ -40,6 +40,7 @@ class StoryNode:
 @dataclass
 class DownloadTask:
     url: str
+    execution_url: str | None = None
     task_id: str = ""
     status: str = "PENDING"
     backend: str | None = None
