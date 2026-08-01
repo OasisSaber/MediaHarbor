@@ -15,7 +15,7 @@ The human provides an existing script or text and asks to find matching video ma
 - Runtime requirements: Windows x64, **Python 3.11+**, and local third-party tools configured per `download-tools/tools.json`.
 - Deployment: clone the whole repository into the agent workspace (no pip install, no build step).
 - Obtain third-party download tools separately and place them under `download-tools/<tool>/` exactly as declared in `download-tools/tools.json` (e.g. `download-tools/yt-dlp/yt-dlp.exe`). MediaHarbor never downloads, installs, or upgrades tools.
-- A unified agent-facing CLI is tracked in Issue #29 and is **not implemented yet**; until then the internal scripts under `skill/mediaharbor/scripts/` are the only entry points (see "Internal Entry Points").
+- The stable agent-facing CLI is `python mediaharbor.py` from the repository root (see "Agent-Facing CLI"). Internal scripts under `skill/mediaharbor/scripts/` are compatibility/internal entry points, not a public API.
 
 ## Roles
 
@@ -143,11 +143,14 @@ The following reliability issues remain open; do not treat them as implemented:
 - **Issue #16**: strict global attempt budgeting, backoff, and additional decoding protection are not finished.
 - **Issue #34**: on partial failure during multi-file moves, files already moved into the final directory have no full rollback guarantee.
 - **Issue #35**: after a task is marked completed, the state protection boundary still needs work if source transaction finalization fails.
-- **Issue #29**: the unified agent-facing CLI is not implemented.
+
+## Agent-Facing CLI
+
+Run `python mediaharbor.py` from the repository root. Commands: `check-tools`, `project-create <name>`, `candidate-add <project> <url>`, `process <project>`, `status <project>`, and `run --project <name> --url <url>`. All commands output JSON with the fixed top-level fields `ok`, `status`, `data`, `error`. This is the only stable entry point recommended by this skill.
 
 ## Internal Entry Points
 
-Until Issue #29 (unified agent-facing CLI) is implemented, the following internal scripts are the only entry points. They are internal, not recommended as a public API:
+The scripts under `skill/mediaharbor/scripts/` are internal compatibility entry points, not a public API; the CLI above is the recommended entry:
 
 | Script | Purpose |
 |---|---|
@@ -156,7 +159,7 @@ Until Issue #29 (unified agent-facing CLI) is implemented, the following interna
 | `orchestrator.py` | Process the task queue (download → validate → hash → source.json → reports) |
 | `router.py` | Route a URL to backends per routing.json with failover |
 | `probe.py` | **Internal diagnostic entry**: probe URLs with yt-dlp |
-| `download.py` | **Legacy / internal**: single-URL download helper; not part of the normal skill workflow, kept until #29 |
+| `download.py` | **Legacy / internal**: single-URL download helper; not part of the normal skill workflow |
 | `acquisition.py`, `project.py`, `report.py`, `process_runner.py`, `ffprobe_validator.py`, `ytdlp_adapter.py`, `safe_path.py`, `_common.py` | Library modules used by the above |
 
 ## Current Status
