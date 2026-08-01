@@ -197,6 +197,53 @@ def cmd_run(args: argparse.Namespace) -> int:
         return _emit(False, "ERROR", error=str(error))
 
 
+def cmd_story_node_add(args: argparse.Namespace) -> int:
+    from acquisition import add_story_node
+
+    try:
+        project = add_story_node(args.project, args.title, args.description)
+        if project is None:
+            return _emit(
+                False,
+                "PROJECT_NOT_FOUND",
+                error=f"Project '{args.project}' not found",
+            )
+        node = project.story_nodes[-1]
+        return _emit(
+            True,
+            "SUCCESS",
+            {"node_id": node.node_id, "title": node.title},
+        )
+    except Exception as error:  # noqa: BLE001 - CLI boundary
+        return _emit(False, "ERROR", error=str(error))
+
+
+def cmd_story_node_list(args: argparse.Namespace) -> int:
+    from project import load_project
+
+    try:
+        project = load_project(args.project)
+        if project is None:
+            return _emit(
+                False,
+                "PROJECT_NOT_FOUND",
+                error=f"Project '{args.project}' not found",
+            )
+        nodes = [
+            {
+                "node_id": n.node_id,
+                "title": n.title,
+                "description": n.description,
+                "search_terms": n.search_terms,
+                "candidate_urls": n.candidate_urls,
+            }
+            for n in project.story_nodes
+        ]
+        return _emit(True, "SUCCESS", {"nodes": nodes})
+    except Exception as error:  # noqa: BLE001 - CLI boundary
+        return _emit(False, "ERROR", error=str(error))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mediaharbor",
@@ -233,6 +280,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser_process = subparsers.add_parser("process", help="Process the pending task queue")
     parser_process.add_argument("project", help="Project name")
 
+    parser_story_node_add = subparsers.add_parser(
+        "story-node-add", help="Add a story node to a project"
+    )
+    parser_story_node_add.add_argument("project", help="Project name")
+    parser_story_node_add.add_argument("title", help="Story node title")
+    parser_story_node_add.add_argument("--description", default="", help="Story node description")
+
+    parser_story_node_list = subparsers.add_parser(
+        "story-node-list", help="List story nodes of a project"
+    )
+    parser_story_node_list.add_argument("project", help="Project name")
+
     parser_status = subparsers.add_parser("status", help="Show project status")
     parser_status.add_argument("project", help="Project name")
 
@@ -257,6 +316,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Force UTF-8 stdio: on non-UTF-8 Windows locales (e.g. en-US cp1252 on
+    # CI runners) printing JSON with ensure_ascii=False raises
+    # UnicodeEncodeError for CJK titles. The CLI contract is UTF-8 JSON.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except (AttributeError, ValueError):
+            pass
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.command == "check-tools":
@@ -267,6 +334,10 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_candidate_add(args)
     if args.command == "process":
         return cmd_process(args)
+    if args.command == "story-node-add":
+        return cmd_story_node_add(args)
+    if args.command == "story-node-list":
+        return cmd_story_node_list(args)
     if args.command == "status":
         return cmd_status(args)
     if args.command == "run":

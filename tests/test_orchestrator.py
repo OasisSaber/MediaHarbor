@@ -84,6 +84,47 @@ def test_generate_source_json_includes_sha256():
             os.chdir(cwd)
 
 
+def test_source_json_populates_story_node_id():
+    from orchestrator import _build_source_entry
+    from process_runner import BackendResult
+    from project import Candidate, StoryNode, create_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("story-node-source-test")
+            node = StoryNode(title="节点A", description="发射素材")
+            p.story_nodes.append(node)
+            p.candidates.append(
+                Candidate(
+                    execution_url="https://example.com/v",
+                    display_url="https://example.com/v",
+                    state="ACCEPTED",
+                    story_node_title="节点A",
+                )
+            )
+            save_project(p)
+
+            video = Path(tmp) / "output" / "story-node-source-test" / "assets" / "originals"
+            video.mkdir(parents=True)
+            test_file = video / "sample.mp4"
+            test_file.write_bytes(b"fake media content for testing")
+
+            entry = _build_source_entry(
+                "story-node-source-test",
+                "https://example.com/v",
+                BackendResult(status="SUCCESS", output_paths=[test_file], attempts=[]),
+                "yt-dlp",
+                main_file=test_file,
+            )
+            assert entry is not None
+            assert entry["story_node_id"] == node.node_id
+        finally:
+            os.chdir(cwd)
+
+
 def test_generate_source_json_nonexistent_project(tmp_path):
     from orchestrator import _generate_source_json
     from process_runner import BackendResult
