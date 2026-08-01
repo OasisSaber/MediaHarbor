@@ -28,7 +28,7 @@ The human provides an existing script or text and asks to find matching video ma
 1. **Analyze the script**: extract people, events, years, locations, time spans, and visual needs.
 2. **Generate search terms**: cover multiple strategies (keyword, reverse image description, scene description).
 3. **Search candidate pages**: default scope is public Bilibili and YouTube pages; this is a default search scope, not a hard hostname allowlist in the download core.
-4. **Enqueue candidate URLs**: add candidate URLs to the acquisition project task queue (status `PENDING`).
+4. **Preflight and enqueue candidates**: probe each candidate URL, capture compact metadata (platform/media ID, title, uploader, publish date, duration, live status, format summary), and score provenance deterministically. Candidates at or above the provenance threshold are enqueued (status `PENDING`); below-threshold or duplicate candidates are recorded with rejection reasons and are not downloaded unless an explicit override is supplied. Probe failures produce an explicit `FAILED_PROBE` state with a reason, never a fabricated score.
 5. **Controlled download**: match the routing table, select a backend, invoke the local download tool via a subprocess argument array, fail over across a limited number of backends in order (default max 3).
 6. **Validate**: ffprobe checks a non-empty file, location inside the output directory, parseable media, duration > 0, and a video stream.
 7. **Archive**: rename to `task_id-original name`, move to `assets/originals/`, write per-source `source.json` manifests (sha256 + ffprobe metadata), update the project materials table.
@@ -118,7 +118,8 @@ Classify failures from the return code and merged stdout+stderr, in priority ord
 ## Project Data Structures
 
 - **Task state machine**: `PENDING → RUNNING → COMPLETED/FAILED`, `FAILED → PENDING` (retry), `PENDING → SKIPPED`, `SKIPPED → PENDING`. Invalid transitions are treated as programming errors.
-- **Source manifest**: each successful source produces `source.json` with source_id, display_url (sanitized), selected_backend, attempt_history (backend/status/error per attempt), local_files, subtitles, thumbnail, sha256, ffprobe_result (format/duration/resolution/codecs), acquisition_timestamp, and a copyright notice.
+- **Candidate preflight**: each candidate records execution/display URLs, platform and media ID, title, uploader, publish date, duration, live status, a compact format summary (count/max height/max FPS/max bitrate), the search query/strategy, story node, state (`PENDING`/`ACCEPTED`/`REJECTED`/`FAILED_PROBE`), rejection reasons, provenance score and component reasons, and explicit override metadata. Complete format arrays, media direct URLs, cookies, and headers are never persisted.
+- **Source manifest**: each successful source produces `source.json` with source_id, display_url (sanitized), selected_backend, attempt_history (backend/status/error per attempt), local_files, subtitles, thumbnail, sha256, ffprobe_result (format/duration/resolution/codecs), acquisition_timestamp, and a copyright notice. When a candidate exists, its platform, media ID, title, uploader, publish date, duration, search query, provenance score, and story node are populated instead of `null`.
 - **Routing table** (`download-tools/routing.json`): schema_version=1; entries carry name, patterns (regex list), backends (ordered list limited to yt-dlp/yutto/streamlink/n-m3u8dl-re/gallery-dl), max_retries (1-5), drm_stop. Routes are matched in order; the first hit applies. Editing only allows whitelisted backend names and validated regex.
 
 ## Reports and Handoff

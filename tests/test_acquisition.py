@@ -279,3 +279,193 @@ def test_clean_url_passthrough():
             assert r.tasks[0].url == "https://example.com/v?id=1"
         finally:
             os.chdir(cwd)
+
+
+def test_preflight_probe_failure_holds_candidate():
+    from unittest.mock import patch
+
+    from acquisition import preflight_candidate
+    from process_runner import ProcessResult
+    from project import create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("preflight-fail-test")
+            save_project(p)
+            with patch(
+                "ytdlp_adapter.probe_url",
+                return_value=ProcessResult(
+                    returncode=-1, stdout="", stderr="yt-dlp not found", status="TOOL_MISSING"
+                ),
+            ):
+                candidate = preflight_candidate(
+                    "preflight-fail-test", "https://example.com/video?id=1"
+                )
+            assert candidate is not None
+            assert candidate.state == "FAILED_PROBE"
+            assert candidate.probe_error
+            project = load_project("preflight-fail-test")
+            assert len(project.candidates) == 1
+            assert len(project.tasks) == 0
+        finally:
+            os.chdir(cwd)
+
+
+def test_preflight_accepts_high_provenance_and_enqueues():
+    import json as _json
+    from unittest.mock import patch
+
+    from acquisition import preflight_candidate
+    from process_runner import ProcessResult
+    from project import create_project, load_project, save_project
+
+    probe_json = _json.dumps(
+        {
+            "id": "BV1abc",
+            "title": "Official archive recording",
+            "extractor": "BiliBili",
+            "uploader": "National Archive",
+            "upload_date": "20260101",
+            "duration": 1800.0,
+            "is_live": False,
+            "formats": [{"height": 1080, "fps": 30, "tbr": 5000.0}],
+        }
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("preflight-accept-test")
+            save_project(p)
+            with patch(
+                "ytdlp_adapter.probe_url",
+                return_value=ProcessResult(
+                    returncode=0, stdout=probe_json, stderr="", status="SUCCESS"
+                ),
+            ):
+                candidate = preflight_candidate(
+                    "preflight-accept-test",
+                    "https://example.com/video?id=1",
+                    search_query="archival footage",
+                    node_title="Intro",
+                )
+            assert candidate is not None
+            assert candidate.state == "ACCEPTED"
+            assert candidate.platform_media_id == "BV1abc"
+            assert candidate.title == "Official archive recording"
+            assert candidate.uploader == "National Archive"
+            assert candidate.publish_date == "20260101"
+            assert candidate.format_summary["max_height"] == 1080
+            assert candidate.provenance_score is not None
+            project = load_project("preflight-accept-test")
+            assert len(project.candidates) == 1
+            assert len(project.tasks) == 1
+            assert project.tasks[0].execution_url == "https://example.com/video?id=1"
+        finally:
+            os.chdir(cwd)
+
+
+def test_preflight_rejects_low_provenance_without_override():
+    import json as _json
+    from unittest.mock import patch
+
+    from acquisition import preflight_candidate
+    from process_runner import ProcessResult
+    from project import create_project, load_project, save_project
+
+    probe_json = _json.dumps(
+        {
+            "id": "BV2xyz",
+            "title": "Reaction and commentary of the event",
+            "extractor": "BiliBili",
+            "uploader": "Fan Channel",
+            "duration": 30.0,
+            "is_live": False,
+            "formats": [],
+        }
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("preflight-reject-test")
+            save_project(p)
+            with patch(
+                "ytdlp_adapter.probe_url",
+                return_value=ProcessResult(
+                    returncode=0, stdout=probe_json, stderr="", status="SUCCESS"
+                ),
+            ):
+                candidate = preflight_candidate(
+                    "preflight-reject-test", "https://example.com/video?id=2"
+                )
+            assert candidate is not None
+            assert candidate.state == "REJECTED"
+            assert candidate.rejection_reasons == ["below-provenance-threshold"]
+            project = load_project("preflight-reject-test")
+            assert len(project.candidates) == 1
+            assert len(project.tasks) == 0
+        finally:
+            os.chdir(cwd)
+
+
+def test_preflight_duplicate_media_id_rejected_and_override_enqueues():
+    import json as _json
+    from unittest.mock import patch
+
+    from acquisition import preflight_candidate
+    from process_runner import ProcessResult
+    from project import Candidate, create_project, load_project, save_project
+
+    probe_json = _json.dumps(
+        {
+            "id": "BVdup",
+            "title": "Official recording",
+            "extractor": "BiliBili",
+            "uploader": "National Archive",
+            "duration": 1800.0,
+            "is_live": False,
+            "formats": [],
+        }
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            p = create_project("preflight-dup-test")
+            p.candidates.append(
+                Candidate(
+                    execution_url="https://example.com/old",
+                    display_url="https://example.com/old",
+                    platform_media_id="BVdup",
+                    state="ACCEPTED",
+                )
+            )
+            save_project(p)
+            with patch(
+                "ytdlp_adapter.probe_url",
+                return_value=ProcessResult(
+                    returncode=0, stdout=probe_json, stderr="", status="SUCCESS"
+                ),
+            ):
+                candidate = preflight_candidate("preflight-dup-test", "https://example.com/new")
+                assert candidate is not None
+                assert candidate.state == "REJECTED"
+                assert "duplicate-platform-media-id" in candidate.rejection_reasons
+
+                overridden = preflight_candidate(
+                    "preflight-dup-test", "https://example.com/new2", override=True
+                )
+                assert overridden is not None
+                assert overridden.state == "ACCEPTED"
+                assert overridden.overridden is True
+            project = load_project("preflight-dup-test")
+            assert len(project.tasks) == 1
+        finally:
+            os.chdir(cwd)

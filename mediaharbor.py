@@ -79,18 +79,33 @@ def cmd_project_create(args: argparse.Namespace) -> int:
 
 
 def cmd_candidate_add(args: argparse.Namespace) -> int:
-    from acquisition import add_candidate
+    from acquisition import preflight_candidate
 
     try:
-        project = add_candidate(args.project, args.url)
-        if project is None:
-            return _emit(False, "PROJECT_NOT_FOUND", error=f"Project '{args.project}' not found")
-        task = project.tasks[-1]
-        return _emit(
-            True,
-            "SUCCESS",
-            {"url": task.url, "task_id": task.task_id, "status": task.status},
+        candidate = preflight_candidate(
+            args.project,
+            args.url,
+            search_query=args.search_query,
+            node_title=args.node_title,
+            override=args.override,
         )
+        if candidate is None:
+            return _emit(False, "PROJECT_NOT_FOUND", error=f"Project '{args.project}' not found")
+        data = {
+            "candidate_id": candidate.candidate_id,
+            "url": candidate.display_url,
+            "state": candidate.state,
+            "provenance_score": candidate.provenance_score,
+            "provenance_reasons": candidate.provenance_reasons,
+            "rejection_reasons": candidate.rejection_reasons,
+            "probe_error": candidate.probe_error,
+            "title": candidate.title,
+            "platform": candidate.platform,
+            "overridden": candidate.overridden,
+        }
+        if candidate.state == "ACCEPTED":
+            return _emit(True, "ACCEPTED", data)
+        return _emit(False, candidate.state, data)
     except Exception as error:  # noqa: BLE001 - CLI boundary
         return _emit(False, "ERROR", error=str(error))
 
@@ -146,7 +161,7 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
-    from acquisition import add_candidate
+    from acquisition import preflight_candidate
     from orchestrator import process_pending
     from project import create_project, load_project, save_project
 
@@ -154,9 +169,24 @@ def cmd_run(args: argparse.Namespace) -> int:
         if load_project(args.project) is None:
             project = create_project(args.project)
             save_project(project)
-        added = add_candidate(args.project, args.url)
-        if added is None:
+        candidate = preflight_candidate(
+            args.project,
+            args.url,
+            search_query=args.search_query,
+            node_title=args.node_title,
+            override=args.override,
+        )
+        if candidate is None:
             return _emit(False, "PROJECT_NOT_FOUND", error=f"Project '{args.project}' not found")
+        if candidate.state != "ACCEPTED":
+            return _emit(
+                False,
+                candidate.state,
+                {
+                    "rejection_reasons": candidate.rejection_reasons,
+                    "probe_error": candidate.probe_error,
+                },
+            )
         results = process_pending(args.project)
         ok = results["failed"] == 0
         status = "SUCCESS" if ok and results["processed"] else "NO_PENDING"
@@ -184,10 +214,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser_project_create.add_argument("name", help="Project name (safe name rules apply)")
 
     parser_candidate_add = subparsers.add_parser(
-        "candidate-add", help="Add a candidate URL to a project"
+        "candidate-add", help="Probe a candidate and enqueue it when accepted"
     )
     parser_candidate_add.add_argument("project", help="Project name")
     parser_candidate_add.add_argument("url", help="Candidate URL")
+    parser_candidate_add.add_argument(
+        "--search-query", default="", help="Original search query or strategy"
+    )
+    parser_candidate_add.add_argument(
+        "--node-title", default="", help="Associated story node title"
+    )
+    parser_candidate_add.add_argument(
+        "--override",
+        action="store_true",
+        help="Enqueue even when the provenance gate rejects the candidate (auditable)",
+    )
 
     parser_process = subparsers.add_parser("process", help="Process the pending task queue")
     parser_process.add_argument("project", help="Project name")
@@ -196,10 +237,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser_status.add_argument("project", help="Project name")
 
     parser_run = subparsers.add_parser(
-        "run", help="Create project (if needed), add candidate, and process the queue"
+        "run", help="Create project (if needed), preflight a candidate, and process the queue"
     )
     parser_run.add_argument("--project", required=True, help="Project name")
     parser_run.add_argument("--url", required=True, help="Candidate URL")
+    parser_run.add_argument("--search-query", default="", help="Original search query or strategy")
+    parser_run.add_argument("--node-title", default="", help="Associated story node title")
+    parser_run.add_argument(
+        "--override",
+        action="store_true",
+        help="Enqueue even when the provenance gate rejects the candidate (auditable)",
+    )
 
     for sub in subparsers.choices.values():
         sub.add_argument(

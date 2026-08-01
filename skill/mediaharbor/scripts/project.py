@@ -67,6 +67,37 @@ class MaterialInfo:
 
 
 @dataclass
+class Candidate:
+    execution_url: str
+    display_url: str
+    candidate_id: str = ""
+    platform: str | None = None
+    platform_media_id: str | None = None
+    title: str | None = None
+    uploader: str | None = None
+    uploader_id: str | None = None
+    publish_date: str | None = None
+    duration: float | None = None
+    is_live: bool | None = None
+    format_summary: dict | None = None
+    search_query: str | None = None
+    story_node_title: str | None = None
+    state: str = "PENDING"
+    rejection_reasons: list[str] = field(default_factory=list)
+    provenance_score: float | None = None
+    provenance_reasons: list[str] = field(default_factory=list)
+    probe_error: str | None = None
+    overridden: bool = False
+    created_at: str = ""
+
+    def __post_init__(self):
+        if not self.candidate_id:
+            self.candidate_id = str(uuid.uuid4())[:8]
+        if not self.created_at:
+            self.created_at = datetime.now(timezone.utc).isoformat()
+
+
+@dataclass
 class Project:
     name: str
     schema_version: int = SCHEMA_VERSION
@@ -75,6 +106,7 @@ class Project:
     updated_at: str = ""
     script: str = ""
     story_nodes: list[StoryNode] = field(default_factory=list)
+    candidates: list[Candidate] = field(default_factory=list)
     tasks: list[DownloadTask] = field(default_factory=list)
     materials: list[MaterialInfo] = field(default_factory=list)
 
@@ -189,6 +221,7 @@ def _validate_transition(current: str, next_state: str, task_id: str):
 
 def _project_from_dict(data: dict[str, Any]) -> Project:
     nodes = [StoryNode(**n) for n in data.get("story_nodes", [])]
+    candidates = [Candidate(**c) for c in data.get("candidates", [])]
     tasks = [DownloadTask(**t) for t in data.get("tasks", [])]
     materials = [MaterialInfo(**m) for m in data.get("materials", [])]
     return Project(
@@ -199,6 +232,7 @@ def _project_from_dict(data: dict[str, Any]) -> Project:
         updated_at=data.get("updated_at", ""),
         script=data.get("script", ""),
         story_nodes=nodes,
+        candidates=candidates,
         tasks=tasks,
         materials=materials,
     )

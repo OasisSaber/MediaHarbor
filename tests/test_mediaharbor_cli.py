@@ -80,8 +80,8 @@ def test_project_create_and_status_roundtrip():
         _cleanup_project(project_name)
 
 
-def test_candidate_add_and_process_flow():
-    project_name = _unique_project("cli-flow")
+def test_candidate_add_probe_failure_holds_candidate():
+    project_name = _unique_project("cli-probe-fail")
     try:
         with tempfile.TemporaryDirectory() as tmp:
             _setup_temp_workspace(tmp)
@@ -91,8 +91,35 @@ def test_candidate_add_and_process_flow():
                 tmp, "candidate-add", project_name, "https://example.com/video", "--json"
             )
             payload = _load_json(result)
+            assert payload["ok"] is False
+            assert payload["status"] == "FAILED_PROBE"
+            assert payload["data"]["state"] == "FAILED_PROBE"
+
+            result = _run_cli(tmp, "process", project_name, "--json")
+            payload = _load_json(result)
+            assert payload["data"]["processed"] == 0
+    finally:
+        _cleanup_project(project_name)
+
+
+def test_candidate_add_and_process_flow():
+    project_name = _unique_project("cli-flow")
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            _setup_temp_workspace(tmp)
+            _run_cli(tmp, "project-create", project_name, "--json")
+
+            result = _run_cli(
+                tmp,
+                "candidate-add",
+                project_name,
+                "https://example.com/video",
+                "--override",
+                "--json",
+            )
+            payload = _load_json(result)
             assert payload["ok"] is True
-            assert payload["data"]["status"] == "PENDING"
+            assert payload["status"] == "ACCEPTED"
 
             result = _run_cli(tmp, "process", project_name, "--json")
             payload = _load_json(result)
@@ -132,6 +159,7 @@ def test_run_composite_command():
                 project_name,
                 "--url",
                 "https://example.com/video",
+                "--override",
                 "--json",
             )
             payload = _load_json(result)
