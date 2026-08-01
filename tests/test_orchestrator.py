@@ -119,7 +119,8 @@ def test_process_pending_streamlink_success():
             add_candidate("streamlink-success-test", "https://example.com/live")
             task_id = load_project("streamlink-success-test").tasks[0].task_id
 
-            def fake_download(_url, output_dir, runner=None):
+            def fake_download(_url, output_dir, runner=None, format_selector=None):
+                del format_selector
                 del runner
                 fake_file = output_dir / "stream.ts"
                 fake_file.write_text("dummy media content")
@@ -194,7 +195,8 @@ def test_process_pending_isolates_and_finalizes_task_artifacts():
             stale = final_dir / "stream.ts"
             stale.write_text("existing material")
 
-            def fake_download(_url, output_dir, runner=None):
+            def fake_download(_url, output_dir, runner=None, format_selector=None):
+                del format_selector
                 del runner
                 output_dir.mkdir(parents=True, exist_ok=True)
                 main = output_dir / "stream.ts"
@@ -264,7 +266,8 @@ def test_process_pending_hashes_each_main_media_independently():
                 "second.mp4": b"second media",
             }
 
-            def fake_download(_url, output_dir, runner=None):
+            def fake_download(_url, output_dir, runner=None, format_selector=None):
+                del format_selector
                 del runner
                 output_dir.mkdir(parents=True, exist_ok=True)
                 paths = []
@@ -320,7 +323,8 @@ def test_consecutive_streamlink_tasks_keep_distinct_artifacts():
             add_candidate(project_name, "https://example.com/live/one")
             add_candidate(project_name, "https://example.com/live/two")
 
-            def fake_download(url, output_dir, runner=None):
+            def fake_download(url, output_dir, runner=None, format_selector=None):
+                del format_selector
                 del runner
                 stream = output_dir / "stream.ts"
                 stream.write_text(url)
@@ -371,7 +375,8 @@ def test_validation_exception_fails_one_task_and_continues_queue():
             add_candidate(project_name, first_url)
             add_candidate(project_name, second_url)
 
-            def fake_download(url, output_dir, runner=None):
+            def fake_download(url, output_dir, runner=None, format_selector=None):
+                del format_selector
                 del runner
                 media = output_dir / "video.mp4"
                 media.write_text(url)
@@ -460,7 +465,8 @@ def test_project_commit_failure_leaves_no_success_source_or_final_artifact():
             add_candidate(project_name, url)
             task_id = load_project(project_name).tasks[0].task_id
 
-            def fake_download(_url, output_dir, runner=None):
+            def fake_download(_url, output_dir, runner=None, format_selector=None):
+                del format_selector
                 del runner
                 media = output_dir / "video.mp4"
                 media.write_text("media")
@@ -596,7 +602,8 @@ def test_execution_url_used_for_download():
 
             captured: dict[str, str] = {}
 
-            def fake_download(url, output_dir, runner=None):
+            def fake_download(url, output_dir, runner=None, format_selector=None):
+                del format_selector
                 del runner
                 captured["url"] = url
                 fake_file = output_dir / "video.mp4"
@@ -691,7 +698,8 @@ def test_finalize_midway_failure_rolls_back_and_fails_task():
             stale = final_dir / f"{task_id}-stream.ts"
             stale.write_text("existing material")
 
-            def fake_download(_url, output_dir, runner=None):
+            def fake_download(_url, output_dir, runner=None, format_selector=None):
+                del format_selector
                 del runner
                 output_dir.mkdir(parents=True, exist_ok=True)
                 main = output_dir / "stream.ts"
@@ -760,7 +768,8 @@ def test_finalize_rollback_failure_removes_partial_files():
             final_dir = project_dir / "assets" / "originals"
             final_dir.mkdir(parents=True, exist_ok=True)
 
-            def fake_download(_url, output_dir, runner=None):
+            def fake_download(_url, output_dir, runner=None, format_selector=None):
+                del format_selector
                 del runner
                 output_dir.mkdir(parents=True, exist_ok=True)
                 main = output_dir / "stream.ts"
@@ -821,7 +830,8 @@ def test_completed_task_survives_source_commit_failure():
             add_candidate(project_name, url)
             task_id = load_project(project_name).tasks[0].task_id
 
-            def fake_download(_url, output_dir, runner=None):
+            def fake_download(_url, output_dir, runner=None, format_selector=None):
+                del format_selector
                 del runner
                 media = output_dir / "video.mp4"
                 media.write_text("media")
@@ -903,7 +913,8 @@ def test_source_json_populated_from_candidate_metadata():
                 )
             assert candidate.state == "ACCEPTED"
 
-            def fake_download(_url, output_dir, runner=None):
+            def fake_download(_url, output_dir, runner=None, format_selector=None):
+                del format_selector
                 del runner
                 media = output_dir / "video.mp4"
                 media.write_text("media")
@@ -933,5 +944,118 @@ def test_source_json_populated_from_candidate_metadata():
             assert data["publish_date"] == "20260101"
             assert data["duration"] == 1800.0
             assert data["search_query"] == "archival"
+        finally:
+            os.chdir(cwd)
+
+
+def test_process_pending_rejects_no_qualifying_format_before_download():
+    import json as _json
+    from unittest.mock import patch
+
+    from acquisition import preflight_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, ProcessResult
+    from project import create_project, load_project, save_project
+
+    probe_json = _json.dumps(
+        {
+            "id": "BVlow",
+            "title": "Official archive recording",
+            "extractor": "BiliBili",
+            "uploader": "National Archive",
+            "duration": 1800.0,
+            "is_live": False,
+            "formats": [{"height": 360, "fps": 24}],
+        }
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"quality-gate-{Path(tmp).name}"
+            save_project(create_project(project_name))
+            with patch(
+                "ytdlp_adapter.probe_url",
+                return_value=ProcessResult(
+                    returncode=0, stdout=probe_json, stderr="", status=SUCCESS
+                ),
+            ):
+                candidate = preflight_candidate(project_name, "https://example.com/low")
+            assert candidate.state == "ACCEPTED"
+
+            called = {"download": False}
+
+            def fake_download(_url, _output_dir, runner=None, format_selector=None):
+                del runner, format_selector
+                called["download"] = True
+                raise AssertionError("download must not run")
+
+            with patch("orchestrator.download_with_fallback", side_effect=fake_download):
+                results = process_pending(project_name)
+
+            assert called["download"] is False
+            assert results["failed"] == 1
+            task = load_project(project_name).tasks[0]
+            assert "NO_QUALIFYING_FORMAT" in task.error
+        finally:
+            os.chdir(cwd)
+
+
+def test_process_pending_sets_quality_status_from_ffprobe():
+    import json as _json
+    from unittest.mock import patch
+
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult, ProcessResult
+    from project import create_project, load_project, save_project
+
+    ffprobe_json = _json.dumps(
+        {
+            "format": {"format_name": "mp4", "duration": "30.0", "size": "100"},
+            "streams": [
+                {
+                    "codec_type": "video",
+                    "codec_name": "h264",
+                    "width": 640,
+                    "height": 360,
+                    "avg_frame_rate": "30/1",
+                }
+            ],
+        }
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"quality-post-{Path(tmp).name}"
+            save_project(create_project(project_name))
+            add_candidate(project_name, "https://example.com/lowres")
+
+            def fake_download(_url, output_dir, runner=None, format_selector=None):
+                del runner, format_selector
+                media = output_dir / "video.mp4"
+                media.write_text("media")
+                return BackendResult(status=SUCCESS, output_paths=[media]), "yt-dlp"
+
+            with (
+                patch("orchestrator.download_with_fallback", side_effect=fake_download),
+                patch("orchestrator._validate_downloaded_file") as validation,
+            ):
+                validation.return_value = ProcessResult(
+                    returncode=0,
+                    stdout=ffprobe_json,
+                    stderr="",
+                    status=SUCCESS,
+                )
+                results = process_pending(project_name)
+
+            assert results["success"] == 1
+            material = load_project(project_name).materials[0]
+            assert material.quality_status == "REJECT"
+            assert any("height" in r for r in material.quality_reasons)
+            assert material.technical_status == "PASS"
         finally:
             os.chdir(cwd)

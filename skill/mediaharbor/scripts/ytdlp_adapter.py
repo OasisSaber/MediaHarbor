@@ -37,13 +37,15 @@ def build_probe_args(url: str) -> list[str]:
     return ["--no-playlist", "--dump-json", "--skip-download", url]
 
 
-def build_download_args(url: str, output_dir: Path) -> list[str]:
+def build_download_args(
+    url: str, output_dir: Path, format_selector: str | None = None
+) -> list[str]:
     template = output_dir / "%(extractor)s-%(id)s.%(ext)s"
     ffmpeg_dir = find_project_root() / "download-tools" / "ffmpeg"
     args = [
         "--no-playlist",
         "--format",
-        "bv*+ba/b",
+        format_selector or "bv*+ba/b",
         "-o",
         str(template),
         "--print",
@@ -145,6 +147,7 @@ def download_url(
     runner: ProcessRunner | None = None,
     allow_system_path: bool = False,
     max_attempts: int | None = None,
+    format_selector: str | None = None,
 ) -> BackendResult:
     if runner is None:
         runner = ProcessRunner(timeout=DOWNLOAD_TIMEOUT, max_retries=2)
@@ -156,7 +159,7 @@ def download_url(
         )
     output_dir.mkdir(parents=True, exist_ok=True)
     before = snapshot_output_files(output_dir)
-    cmd = [str(yt_path)] + build_download_args(url, output_dir)
+    cmd = [str(yt_path)] + build_download_args(url, output_dir, format_selector=format_selector)
     result = runner.run(cmd, check_drm=True, backend="yt-dlp", max_attempts=max_attempts)
     return _convert_to_backend_result(result, output_dir, before)
 

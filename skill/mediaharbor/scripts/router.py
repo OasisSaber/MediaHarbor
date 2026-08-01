@@ -161,13 +161,20 @@ def execute_backend(
     output_dir: Path,
     runner: ProcessRunner | None = None,
     max_attempts: int | None = None,
+    format_selector: str | None = None,
 ) -> BackendResult:
     if runner is None:
         runner = ProcessRunner()
     if backend_name == "yt-dlp":
         from ytdlp_adapter import download_url
 
-        return download_url(url, output_dir, runner=runner, max_attempts=max_attempts)
+        return download_url(
+            url,
+            output_dir,
+            runner=runner,
+            max_attempts=max_attempts,
+            format_selector=format_selector,
+        )
     if backend_name == "yutto":
         from backends.yutto import run_yutto
 
@@ -196,6 +203,7 @@ def download_with_fallback(
     routes: list[RouteEntry] | None = None,
     max_backends: int = 3,
     runner: ProcessRunner | None = None,
+    format_selector: str | None = None,
 ) -> tuple[BackendResult, str | None]:
     if routes is None:
         try:
@@ -246,6 +254,7 @@ def download_with_fallback(
             attempt_dir,
             runner=runner,
             max_attempts=min(route.max_retries, remaining),
+            format_selector=format_selector,
         )
         all_attempts.extend(result.attempts)
         total_attempts += len(result.attempts)

@@ -81,6 +81,19 @@ def parse_ffprobe_output(stdout: str) -> dict | None:
         return None
 
 
+def _parse_fps(raw: str | None) -> float | None:
+    if not raw:
+        return None
+    try:
+        if "/" in raw:
+            num, _, den = raw.partition("/")
+            den = den or "1"
+            return float(num) / float(den)
+        return float(raw)
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
 def get_media_info(data: dict) -> dict:
     fmt = data.get("format", {})
     streams = data.get("streams", [])
@@ -96,6 +109,19 @@ def get_media_info(data: dict) -> dict:
         "bit_rate": int(fmt.get("bit_rate", 0)) if fmt.get("bit_rate") else None,
         "width": width,
         "height": height,
+        "fps": _parse_fps(video_streams[0].get("avg_frame_rate")) if video_streams else None,
+        "video_bitrate": (
+            int(video_streams[0]["bit_rate"])
+            if video_streams and video_streams[0].get("bit_rate")
+            else None
+        ),
+        "orientation": (
+            "vertical"
+            if width and height and height > width
+            else "landscape"
+            if width and height
+            else None
+        ),
         "video_codec": video_streams[0].get("codec_name") if video_streams else None,
         "audio_codec": audio_streams[0].get("codec_name") if audio_streams else None,
         "has_video": len(video_streams) > 0,

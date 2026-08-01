@@ -59,3 +59,27 @@ def test_get_media_info():
     )
     assert result.returncode == 0, f"stderr: {result.stderr}"
     assert "True 30.5" in result.stdout
+
+
+def test_get_media_info_parses_fps_and_orientation():
+    from ffprobe_validator import get_media_info
+
+    data = {
+        "format": {"format_name": "mp4", "duration": "10.0", "size": "5"},
+        "streams": [
+            {
+                "codec_type": "video",
+                "codec_name": "h264",
+                "width": 720,
+                "height": 1280,
+                "avg_frame_rate": "30000/1001",
+                "bit_rate": "2500000",
+            }
+        ],
+    }
+    media = get_media_info(data)
+    assert abs(media["fps"] - 29.97) < 0.01
+    assert media["video_bitrate"] == 2500000
+    assert media["orientation"] == "vertical"
+    assert media["has_video"] is True
+    assert media["has_audio"] is False
