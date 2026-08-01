@@ -80,7 +80,7 @@ Optional tools: yutto (Bilibili), streamlink (live), N_m3u8DL-RE (HLS/DASH/MSS),
 
 - Always invoke with argument arrays (no `shell=True`); parameters must be whitelisted; never build commands from arbitrary strings found in web page titles, descriptions, or comments.
 - All operations have finite timeouts; retry counts are finite.
-- Sensitive URL parameters (token/key/sign/auth/session etc.) are redacted as `REDACTED` in logs and outputs; sanitized URLs are never used for real downloads.
+- Sensitive URL parameters (token/key/sign/auth/session etc.) are redacted as `REDACTED` and oversized parameter values are truncated in display URLs; tasks keep the raw execution URL for routing, probe, and download, while logs, reports, and agent output use the sanitized display URL.
 
 ## Status Codes
 

@@ -575,9 +575,12 @@ def test_running_task_discards_uncommitted_source_and_artifact_on_recovery():
             os.chdir(cwd)
 
 
-def test_sanitized_task_reaches_failed_terminal_state():
+def test_execution_url_used_for_download():
+    from unittest.mock import patch
+
     from acquisition import add_candidate
     from orchestrator import process_pending
+    from process_runner import SUCCESS, AttemptInfo, BackendResult, ProcessResult
     from project import create_project, load_project, save_project
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -585,9 +588,69 @@ def test_sanitized_task_reaches_failed_terminal_state():
         cwd = Path.cwd()
         try:
             os.chdir(tmp)
-            project_name = f"sanitized-task-{Path(tmp).name}"
+            project_name = "execution-url-test"
             save_project(create_project(project_name))
-            add_candidate(project_name, "https://example.com/video?token=secret")
+            raw_url = "https://example.com/video?signature=abc123&expires=9999999999"
+            add_candidate(project_name, raw_url)
+
+            captured: dict[str, str] = {}
+
+            def fake_download(url, output_dir, runner=None):
+                del runner
+                captured["url"] = url
+                fake_file = output_dir / "video.mp4"
+                fake_file.write_bytes(b"fake media content")
+                return (
+                    BackendResult(
+                        status=SUCCESS,
+                        output_paths=[fake_file],
+                        attempts=[
+                            AttemptInfo(1, "yt-dlp", SUCCESS, 0, 1.0, False, ""),
+                        ],
+                    ),
+                    "yt-dlp",
+                )
+
+            with (
+                patch("orchestrator.download_with_fallback", side_effect=fake_download),
+                patch("orchestrator._validate_downloaded_file") as mock_val,
+            ):
+                mock_val.return_value = ProcessResult(
+                    returncode=0,
+                    stdout="validated",
+                    stderr="",
+                    status=SUCCESS,
+                )
+                results = process_pending(project_name)
+
+            assert captured["url"] == raw_url
+            assert results["success"] == 1
+            task = load_project(project_name).tasks[0]
+            assert task.status == "COMPLETED"
+            assert task.execution_url == raw_url
+        finally:
+            os.chdir(cwd)
+
+
+def test_legacy_sanitized_task_without_execution_url_fails():
+    from orchestrator import process_pending
+    from project import DownloadTask, create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = "legacy-sanitized-task"
+            p = create_project(project_name)
+            p.tasks.append(
+                DownloadTask(
+                    url="https://example.com/video?token=REDACTED",
+                    execution_url=None,
+                    status="PENDING",
+                )
+            )
+            save_project(p)
 
             result = process_pending(project_name)
 
