@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from process_runner import sanitize_url
+from process_runner import ProcessRunner, sanitize_url
 from project import (
+    Candidate,
     DownloadTask,
     MaterialInfo,
     Project,
@@ -32,6 +33,127 @@ def add_candidate(project_name: str, url: str, node_title: str = "") -> Project 
     project.tasks.append(task)
     save_project(project)
     return project
+
+
+def _attach_story_node(project: Project, candidate: Candidate) -> None:
+    if not candidate.story_node_title:
+        return
+    for node in project.story_nodes:
+        if node.title == candidate.story_node_title:
+            if candidate.display_url not in node.candidate_urls:
+                node.candidate_urls.append(candidate.display_url)
+            break
+
+
+def _enqueue_candidate(project: Project, candidate: Candidate) -> None:
+    if candidate.candidate_id not in [c.candidate_id for c in project.candidates]:
+        project.candidates.append(candidate)
+    task = DownloadTask(
+        url=candidate.display_url,
+        execution_url=candidate.execution_url,
+        status="PENDING",
+    )
+    project.tasks.append(task)
+    _attach_story_node(project, candidate)
+    save_project(project)
+
+
+def preflight_candidate(
+    project_name: str,
+    url: str,
+    search_query: str = "",
+    node_title: str = "",
+    override: bool = False,
+    runner: ProcessRunner | None = None,
+) -> Candidate | None:
+    """Probe a candidate, score provenance, and enqueue only when accepted.
+
+    Probe failures produce an explicit ``FAILED_PROBE`` state with a reason,
+    never a fabricated high score. Candidates below the provenance threshold
+    remain recorded with rejection reasons and are not downloaded unless an
+    explicit override is supplied.
+    """
+    from provenance import MIN_PROVENANCE_THRESHOLD, reasons_to_messages, score_candidate
+    from ytdlp_adapter import parse_probe_json, probe_url
+
+    project = load_project(project_name)
+    if project is None:
+        return None
+
+    display_url = sanitize_url(url)
+    for existing in project.candidates:
+        if existing.display_url == display_url:
+            return existing
+
+    candidate = Candidate(
+        execution_url=url,
+        display_url=display_url,
+        search_query=search_query or None,
+        story_node_title=node_title or None,
+    )
+    probe = probe_url(url, runner=runner)
+    if probe.status != "SUCCESS":
+        candidate.state = "FAILED_PROBE"
+        candidate.probe_error = sanitize_url(probe.stderr)[:200]
+        candidate.rejection_reasons.append("probe-failed")
+        if override:
+            candidate.overridden = True
+            candidate.state = "ACCEPTED"
+            _enqueue_candidate(project, candidate)
+        else:
+            project.candidates.append(candidate)
+            save_project(project)
+        return candidate
+
+    info = parse_probe_json(probe.stdout) or {}
+    candidate.platform = info.get("extractor")
+    candidate.platform_media_id = info.get("id")
+    candidate.title = info.get("title")
+    candidate.uploader = info.get("uploader") or info.get("channel")
+    candidate.uploader_id = info.get("uploader_id") or info.get("channel_id")
+    candidate.publish_date = info.get("upload_date") or info.get("release_date")
+    candidate.duration = info.get("duration")
+    candidate.is_live = bool(
+        info.get("is_live") or info.get("live_status") in ("is_live", "is_upcoming")
+    )
+    candidate.format_summary = info.get("formats_summary")
+
+    duplicate = bool(
+        candidate.platform_media_id
+        and any(
+            c.platform_media_id == candidate.platform_media_id
+            and c.candidate_id != candidate.candidate_id
+            for c in project.candidates
+        )
+    )
+    score, reason_codes = score_candidate(
+        candidate.title,
+        candidate.uploader,
+        candidate.duration,
+        candidate.is_live,
+        duplicate,
+    )
+    candidate.provenance_score = score
+    candidate.provenance_reasons = reasons_to_messages(reason_codes)
+
+    if override:
+        candidate.overridden = True
+        candidate.state = "ACCEPTED"
+        _enqueue_candidate(project, candidate)
+    elif duplicate:
+        candidate.state = "REJECTED"
+        candidate.rejection_reasons.append("duplicate-platform-media-id")
+        project.candidates.append(candidate)
+        save_project(project)
+    elif score >= MIN_PROVENANCE_THRESHOLD:
+        candidate.state = "ACCEPTED"
+        _enqueue_candidate(project, candidate)
+    else:
+        candidate.state = "REJECTED"
+        candidate.rejection_reasons.append("below-provenance-threshold")
+        project.candidates.append(candidate)
+        save_project(project)
+    return candidate
 
 
 def add_story_node(project_name: str, title: str, description: str) -> Project | None:

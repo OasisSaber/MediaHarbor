@@ -99,6 +99,12 @@ def parse_probe_json(output: str) -> dict[str, Any] | None:
             "extractor",
             "is_live",
             "live_status",
+            "uploader",
+            "channel",
+            "uploader_id",
+            "channel_id",
+            "upload_date",
+            "release_date",
         ):
             if key in data:
                 result[key] = data[key]

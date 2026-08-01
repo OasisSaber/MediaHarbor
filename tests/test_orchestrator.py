@@ -862,3 +862,76 @@ def test_completed_task_survives_source_commit_failure():
             assert list(source_dir.glob("*.json"))
         finally:
             os.chdir(cwd)
+
+
+def test_source_json_populated_from_candidate_metadata():
+    import json as _json
+    from unittest.mock import patch
+
+    from acquisition import preflight_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult, ProcessResult
+    from project import create_project, project_dir, save_project
+
+    probe_json = _json.dumps(
+        {
+            "id": "BVsrc",
+            "title": "Official archive recording",
+            "extractor": "BiliBili",
+            "uploader": "National Archive",
+            "upload_date": "20260101",
+            "duration": 1800.0,
+            "is_live": False,
+            "formats": [{"height": 1080}],
+        }
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"source-fill-{Path(tmp).name}"
+            save_project(create_project(project_name))
+            with patch(
+                "ytdlp_adapter.probe_url",
+                return_value=ProcessResult(
+                    returncode=0, stdout=probe_json, stderr="", status=SUCCESS
+                ),
+            ):
+                candidate = preflight_candidate(
+                    project_name, "https://example.com/video?id=1", search_query="archival"
+                )
+            assert candidate.state == "ACCEPTED"
+
+            def fake_download(_url, output_dir, runner=None):
+                del runner
+                media = output_dir / "video.mp4"
+                media.write_text("media")
+                return BackendResult(status=SUCCESS, output_paths=[media]), "yt-dlp"
+
+            with (
+                patch("orchestrator.download_with_fallback", side_effect=fake_download),
+                patch("orchestrator._validate_downloaded_file") as validation,
+            ):
+                validation.return_value = ProcessResult(
+                    returncode=0,
+                    stdout="validated",
+                    stderr="",
+                    status=SUCCESS,
+                )
+                results = process_pending(project_name)
+
+            assert results["success"] == 1
+            source_dir = project_dir(project_name) / "acquisition" / "sources"
+            sources = list(source_dir.glob("*.json"))
+            assert len(sources) == 1
+            data = _json.loads(sources[0].read_text(encoding="utf-8"))
+            assert data["platform"] == "BiliBili"
+            assert data["platform_media_id"] == "BVsrc"
+            assert data["title"] == "Official archive recording"
+            assert data["uploader"] == "National Archive"
+            assert data["publish_date"] == "20260101"
+            assert data["duration"] == 1800.0
+            assert data["search_query"] == "archival"
+        finally:
+            os.chdir(cwd)

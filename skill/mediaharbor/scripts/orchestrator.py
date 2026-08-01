@@ -64,18 +64,32 @@ def _build_source_entry(
     thumbnail = thumbnails[0] if thumbnails else None
 
     display_url = sanitize_url(url)
+    candidate = next(
+        (c for c in project.candidates if c.display_url == display_url and c.state == "ACCEPTED"),
+        None,
+    )
+    story_node = next(
+        (
+            n
+            for n in project.story_nodes
+            if n.title == (candidate.story_node_title if candidate else None)
+        ),
+        None,
+    )
     entry = {
         "schema_version": 1,
         "source_id": f"{project.project_id}-{len(project.materials):03d}",
         "project_id": project.project_id,
-        "story_node_id": None,
+        "story_node_id": story_node.node_id if story_node else None,
         "display_url": display_url,
-        "platform": None,
-        "platform_media_id": None,
-        "title": None,
-        "uploader": None,
-        "publish_date": None,
-        "duration": None,
+        "platform": candidate.platform if candidate else None,
+        "platform_media_id": candidate.platform_media_id if candidate else None,
+        "title": candidate.title if candidate else None,
+        "uploader": candidate.uploader if candidate else None,
+        "publish_date": candidate.publish_date if candidate else None,
+        "duration": candidate.duration if candidate else None,
+        "search_query": candidate.search_query if candidate else None,
+        "provenance_score": candidate.provenance_score if candidate else None,
         "selected_backend": backend,
         "attempt_history": [],
         "local_files": local_files,

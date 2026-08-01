@@ -22,7 +22,7 @@ MediaHarbor 是一个本地、单用户、Windows x64 优先的 Agent Skill 源�
 
 首次执行时在仓库根目录自动创建 `output/`，所有素材产物写入 `output/<project-name>/`，报告位于 `output/<project-name>/reports/`。
 
-统一 Agent 面向 CLI（Windows x64 本地工作区）：`python mediaharbor.py`，命令包括 `check-tools`、`project-create <name>`、`candidate-add <project> <url>`、`process <project>`、`status <project>`、`run --project <name> --url <url>`；全部输出固定 JSON 结构（`ok` / `status` / `data` / `error`）。`skill/mediaharbor/scripts/` 下的内部脚本为兼容/内部入口，不属于正常 Skill 工作流（其中 `download.py` 为 legacy/internal，`probe.py` 为内部诊断入口）。
+统一 Agent 面向 CLI（Windows x64 本地工作区）：`python mediaharbor.py`，命令包括 `check-tools`、`project-create <name>`、`candidate-add <project> <url>`（候选先 probe 并做 provenance 评分，低于阈值时挂起，可用 `--override` 强制入队）、`process <project>`、`status <project>`、`run --project <name> --url <url>`；全部输出固定 JSON 结构（`ok` / `status` / `data` / `error`）。`skill/mediaharbor/scripts/` 下的内部脚本为兼容/内部入口，不属于正常 Skill 工作流（其中 `download.py` 为 legacy/internal，`probe.py` 为内部诊断入口）。
 
 ## 主要限制
 
