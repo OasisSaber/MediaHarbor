@@ -1211,3 +1211,60 @@ def test_clean_visual_analysis_keeps_unreviewed():
             assert material.editorial_reasons == []
         finally:
             os.chdir(cwd)
+
+
+def test_process_pending_with_danmaku_artifact_succeeds():
+    from unittest.mock import patch
+
+    from _common import ensure_output_dir
+    from acquisition import add_candidate
+    from orchestrator import process_pending
+    from process_runner import SUCCESS, BackendResult, ProcessResult
+    from project import create_project, load_project, save_project
+
+    with tempfile.TemporaryDirectory() as tmp:
+        _setup_temp_project(tmp)
+        cwd = Path.cwd()
+        try:
+            os.chdir(tmp)
+            project_name = f"danmaku-task-{Path(tmp).name}"
+            save_project(create_project(project_name))
+            add_candidate(project_name, "https://www.bilibili.com/video/BV1danmaku")
+            task_id = load_project(project_name).tasks[0].task_id
+
+            def fake_download(_url, output_dir, runner=None, format_selector=None):
+                del runner, format_selector
+                output_dir.mkdir(parents=True, exist_ok=True)
+                media = output_dir / "BiliBili-BV1danmaku.mp4"
+                media.write_text("media")
+                danmaku = output_dir / "BiliBili-BV1danmaku.danmaku.xml"
+                danmaku.write_text("<d><d p='1'>x</d></d>")
+                return BackendResult(status=SUCCESS, output_paths=[media, danmaku]), "yt-dlp"
+
+            with (
+                patch("orchestrator.download_with_fallback", side_effect=fake_download),
+                patch("orchestrator._validate_downloaded_file") as validation,
+            ):
+                validation.return_value = ProcessResult(
+                    returncode=0,
+                    stdout="validated",
+                    stderr="",
+                    status=SUCCESS,
+                )
+                results = process_pending(project_name)
+
+            assert results["success"] == 1
+            assert results["failed"] == 0
+            project = load_project(project_name)
+            task = project.tasks[0]
+            assert task.status == "COMPLETED"
+            assert len(project.materials) == 1
+            assert project.materials[0].local_path.endswith(".mp4")
+            originals = ensure_output_dir() / project_name / "assets" / "originals"
+            originals_files = {p.name for p in originals.iterdir()}
+            assert any(
+                name.startswith(task_id) and name.endswith(".mp4") for name in originals_files
+            )
+            assert any(name.endswith(".danmaku.xml") for name in originals_files)
+        finally:
+            os.chdir(cwd)

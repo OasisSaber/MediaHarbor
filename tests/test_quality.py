@@ -103,3 +103,27 @@ def test_evaluate_media_fields():
     status, _ = evaluate_media_fields({"width": 720, "height": 1280, "fps": 30.0}, profile)
     assert status == "REJECT"
     assert evaluate_media_fields(None, profile)[0] == "UNKNOWN"
+
+
+def test_build_format_selector_bitrate_only():
+    assert build_format_selector({"minimum_video_bitrate": 2500}) == "bv*[vbr>=2500]+ba/b"
+
+
+def test_build_format_selector_all_three_filters():
+    assert (
+        build_format_selector(
+            {
+                "minimum_height": 720,
+                "minimum_fps": 24,
+                "minimum_video_bitrate": 2500,
+            }
+        )
+        == "bv*[height>=720][fps>=24][vbr>=2500]+ba/b"
+    )
+
+
+def test_build_format_selector_below_minimum_with_bitrate():
+    assert (
+        build_format_selector({"minimum_video_bitrate": 2500, "allow_below_minimum": True})
+        == "bv*[vbr>=2500]/b"
+    )
