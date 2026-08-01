@@ -417,8 +417,9 @@ def _process_started_task(
         project_committed = True
         try:
             _commit_source_transaction(source_pending)
-        except OSError:
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as error:
             entry["source_pending"] = True
+            entry["source_pending_error"] = sanitize_stderr(str(error))[:200]
         entry["file"] = str(valid_file)
         return True, entry
     except Exception:
@@ -472,14 +473,25 @@ def process_pending(project_name: str, runner: ProcessRunner | None = None) -> d
             succeeded, entry = _process_started_task(project_name, started, runner)
         except Exception as error:
             safe_error = sanitize_stderr(f"{type(error).__name__}: {error}")[:200]
-            fail_task(project_name, task.url, f"INTERNAL_ERROR: {safe_error}")
-            succeeded = False
-            entry = {
-                "url": task.url,
-                "backend": None,
-                "status": "INTERNAL_ERROR",
-                "error": safe_error,
-            }
+            try:
+                fail_task(project_name, task.url, f"INTERNAL_ERROR: {safe_error}")
+                succeeded = False
+            except ValueError:
+                succeeded = True
+                entry = {
+                    "url": task.url,
+                    "backend": None,
+                    "status": "SUCCESS",
+                    "error": safe_error,
+                    "source_pending": True,
+                }
+            else:
+                entry = {
+                    "url": task.url,
+                    "backend": None,
+                    "status": "INTERNAL_ERROR",
+                    "error": safe_error,
+                }
         results["success" if succeeded else "failed"] += 1
         results["details"].append(entry)
 
