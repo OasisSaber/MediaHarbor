@@ -118,6 +118,7 @@ class Project:
     candidates: list[Candidate] = field(default_factory=list)
     tasks: list[DownloadTask] = field(default_factory=list)
     materials: list[MaterialInfo] = field(default_factory=list)
+    quality_profile: dict | None = None
 
     def __post_init__(self):
         now = datetime.now(timezone.utc).isoformat()
@@ -246,6 +247,7 @@ def _project_from_dict(data: dict[str, Any]) -> Project:
         candidates=candidates,
         tasks=tasks,
         materials=materials,
+        quality_profile=data.get("quality_profile"),
     )
 
 

@@ -107,8 +107,10 @@ def test_fallback_backends_use_isolated_attempt_directories(tmp_path, monkeypatc
     )
     attempt_dirs = []
 
-    def fake_execute(backend_name, _url, output_dir, runner=None, max_attempts=None):
-        del runner, max_attempts
+    def fake_execute(
+        backend_name, _url, output_dir, runner=None, max_attempts=None, format_selector=None
+    ):
+        del runner, max_attempts, format_selector
         attempt_dirs.append(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         if backend_name == "yt-dlp":
@@ -147,8 +149,10 @@ def test_global_attempt_budget_never_exceeded(tmp_path, monkeypatch):
     )
     observed = []
 
-    def fake_execute(backend_name, _url, output_dir, runner=None, max_attempts=None):
-        del runner, output_dir
+    def fake_execute(
+        backend_name, _url, output_dir, runner=None, max_attempts=None, format_selector=None
+    ):
+        del runner, output_dir, format_selector
         observed.append((backend_name, max_attempts))
         attempts = [
             AttemptInfo(n, backend_name, "DOWNLOAD_FAILED", 1, 0.1, True, "fail")
@@ -183,8 +187,10 @@ def test_fallback_succeeds_after_first_backend_fails(tmp_path, monkeypatch):
         max_retries=1,
     )
 
-    def fake_execute(backend_name, _url, output_dir, runner=None, max_attempts=None):
-        del runner, max_attempts
+    def fake_execute(
+        backend_name, _url, output_dir, runner=None, max_attempts=None, format_selector=None
+    ):
+        del runner, max_attempts, format_selector
         output_dir.mkdir(parents=True, exist_ok=True)
         if backend_name == "yt-dlp":
             return BackendResult(status="DOWNLOAD_FAILED")
@@ -214,8 +220,10 @@ def test_all_backends_fail_returns_last_error(tmp_path, monkeypatch):
         max_retries=1,
     )
 
-    def fake_execute(backend_name, _url, output_dir, runner=None, max_attempts=None):
-        del runner, max_attempts, output_dir
+    def fake_execute(
+        backend_name, _url, output_dir, runner=None, max_attempts=None, format_selector=None
+    ):
+        del runner, max_attempts, output_dir, format_selector
         return BackendResult(status="DOWNLOAD_FAILED", stderr=f"{backend_name} failed")
 
     monkeypatch.setattr(router, "execute_backend", fake_execute)

@@ -29,6 +29,13 @@ from process_runner import (
     sanitize_url,
 )
 from project import DownloadTask, _atomic_write, load_project
+from quality import (
+    FORMAT_NO_QUALIFYING,
+    build_format_selector,
+    evaluate_format_summary,
+    evaluate_media_fields,
+    validate_quality_profile,
+)
 from report import save_handoff, save_report
 from router import download_with_fallback
 from safe_path import resolve_project_dir
@@ -339,8 +346,37 @@ def _process_started_task(
     project_committed = False
 
     try:
+        project = load_project(project_name)
+        if project is None:
+            raise RuntimeError("Project not found")
+        try:
+            profile = validate_quality_profile(project.quality_profile)
+        except ValueError as error:
+            return _fail_started_task(
+                project_name,
+                task.url,
+                {"url": task.url, "backend": None, "status": "CONFIG_ERROR"},
+                f"CONFIG_ERROR: {sanitize_stderr(str(error))[:200]}",
+            )
+        format_selector = build_format_selector(profile)
+        candidate = next(
+            (c for c in project.candidates if c.display_url == task.url and c.state == "ACCEPTED"),
+            None,
+        )
+        if candidate is not None:
+            pre_status, pre_reasons = evaluate_format_summary(candidate.format_summary, profile)
+            if pre_status == FORMAT_NO_QUALIFYING and not profile.get("allow_below_minimum"):
+                return _fail_started_task(
+                    project_name,
+                    task.url,
+                    {"url": task.url, "backend": None, "status": "VALIDATION_FAILED"},
+                    f"NO_QUALIFYING_FORMAT: {'; '.join(pre_reasons)}",
+                )
+
         exec_url = task.execution_url or task.url
-        result, backend = download_with_fallback(exec_url, staging_dir, runner=runner)
+        result, backend = download_with_fallback(
+            exec_url, staging_dir, runner=runner, format_selector=format_selector
+        )
         entry = {"url": task.url, "backend": backend, "status": result.status}
         if result.status != SUCCESS:
             return _fail_started_task(
@@ -374,6 +410,14 @@ def _process_started_task(
                 entry,
                 "VALIDATION_FAILED: invalid media",
             )
+
+        quality_status = "UNKNOWN"
+        quality_reasons: list[str] = []
+        if validations:
+            info = parse_ffprobe_output(validations[0].stdout)
+            media = get_media_info(info) if info else None
+            if media:
+                quality_status, quality_reasons = evaluate_media_fields(media, profile)
 
         try:
             result, finalized_main = _finalize_artifacts(
@@ -424,6 +468,8 @@ def _process_started_task(
             [str(path) for path in result.output_paths],
             material_paths=[str(path) for path in finalized_main],
             material_hashes={str(path): _sha256(path) for path in finalized_main},
+            quality_status=quality_status,
+            quality_reasons=quality_reasons,
             **media_fields,
         )
         if completed is None:
