@@ -9,6 +9,8 @@ orchestration. All commands output JSON with the fixed top-level fields
 Usage:
     python mediaharbor.py check-tools [--json]
     python mediaharbor.py project-create <name> [--json]
+    python mediaharbor.py story-node-add <project> <title> [--description <text>] [--json]
+    python mediaharbor.py story-node-list <project> [--json]
     python mediaharbor.py candidate-add <project> <url> [--json]
     python mediaharbor.py process <project> [--json]
     python mediaharbor.py status <project> [--json]
