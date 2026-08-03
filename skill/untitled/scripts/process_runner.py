@@ -187,7 +187,9 @@ def sanitize_url(url: str) -> str:
                 cleaned[key] = ["REDACTED"]
             else:
                 cleaned[key] = [
-                    value
+                    URL_REDACTION_RE.sub(
+                        lambda m: m.group().split("=")[0] + "=REDACTED", value
+                    )
                     if len(value) <= MAX_DISPLAY_PARAM_LENGTH
                     else f"{value[:MAX_DISPLAY_PARAM_LENGTH]}..."
                     for value in values

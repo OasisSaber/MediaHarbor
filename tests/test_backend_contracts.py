@@ -118,6 +118,11 @@ def test_sanitize_redacts_credential_parameters():
     assert "hunter2" not in redacted_pw
     assert "secret3" not in redacted_pw
 
+    nested = "https://example.com/redirect?next=https://cdn.example.com/v?token=NESTEDSECRET"
+    redacted_nested = sanitize_url(nested)
+    assert "NESTEDSECRET" not in redacted_nested
+    assert "REDACTED" in redacted_nested
+
 
 class TestYuttoContract:
     @patch("backends.yutto.resolve_yutto", return_value=None)
