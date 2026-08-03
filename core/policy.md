@@ -1,8 +1,8 @@
 # Core Policy：授权与发布
 
 > 本文件是 TheMasterplan 工作流中"人类批准"与"发布执行"的权威规则来源。
-> 根部 `AGENTS.md` 引用本文件；`profiles/git.md` 与 `profiles/jj.md` 规定
-> 具体工具（Git / jj）下的安全执行方式。
+> 根部 `AGENTS.md` 引用本文件；`profiles/git.md` 规定
+> Git 工具下的安全执行方式（本项目采用 Git Profile，`profiles/jj.md` 未采用）。
 >
 > 权威顺序：本文件不能覆盖系统安全、法律、平台权限、项目安全、隐私、合规、
 > 数据保护与受保护分支限制；本文件只定义"人类授权"如何生效、何时失效。

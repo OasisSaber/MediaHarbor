@@ -1,8 +1,8 @@
 # Generic Adapter：Harness 映射
 
 > 本文件规定 TheMasterplan 核心规则到任意 Agent Harness 的通用映射，
-> 是 `adapters/` 层的基线与参考实现。`adapters/trellis.md` 等具体 Adapter
-> 按本文件的映射键实现；Harness 特有内容只进 Adapter，不进 Core。
+> 是 `adapters/` 层的基线与参考实现（本项目仅采用本文件）。其他 Harness
+> 特有 Adapter 按本文件的映射键实现；Harness 特有内容只进 Adapter，不进 Core。
 >
 > Core 不依赖任何特定 Harness；Harness 不复制 Core 规则，只映射。
 
