@@ -92,6 +92,28 @@ def test_backend_result_bounds_and_sanitizes_stderr():
     assert len(result.stderr) <= 2000
 
 
+def test_sanitize_redacts_credential_parameters():
+    from process_runner import sanitize_stderr, sanitize_url
+
+    url = (
+        "https://storage.example.com/video.mp4?"
+        "X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F2026%2F08%2F04%2Fauto"
+        "&X-Goog-Signature=abc123signature"
+    )
+    cleaned = sanitize_url(url)
+    assert "svc%40proj.iam" not in cleaned
+    assert "abc123signature" not in cleaned
+    assert "REDACTED" in cleaned
+
+    err = (
+        "failed fetching https://example.com/v?"
+        "x-amz-credential=AKIAEXAMPLE123&x-amz-signature=deadbeef"
+    )
+    redacted = sanitize_stderr(err)
+    assert "AKIAEXAMPLE123" not in redacted
+    assert "deadbeef" not in redacted
+
+
 class TestYuttoContract:
     @patch("backends.yutto.resolve_yutto", return_value=None)
     def test_tool_missing_returns_backend_result(self, mock_resolve, tmp_path):
