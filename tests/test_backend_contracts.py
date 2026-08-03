@@ -123,6 +123,11 @@ def test_sanitize_redacts_credential_parameters():
     assert "NESTEDSECRET" not in redacted_nested
     assert "REDACTED" in redacted_nested
 
+    fragment = "https://example.com/callback#token=FRAGMENTSECRET&x=1"
+    redacted_fragment = sanitize_url(fragment)
+    assert "FRAGMENTSECRET" not in redacted_fragment
+    assert "REDACTED" in redacted_fragment
+
     long_nested = (
         "https://example.com/redirect?next="
         + ("a" * 100)

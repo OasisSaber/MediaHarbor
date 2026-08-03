@@ -175,7 +175,9 @@ def sanitize_url(url: str) -> str:
     try:
         parsed = urlparse(url)
         if not parsed.query:
-            return url
+            return URL_REDACTION_RE.sub(
+                lambda m: m.group().split("=")[0] + "=REDACTED", url
+            )
         params = parse_qs(parsed.query, keep_blank_values=True)
         cleaned = {}
         for key, values in params.items():
