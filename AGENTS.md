@@ -30,7 +30,9 @@
 - 采用日期：2026-08-03
 - GitHub Actions 消费者接口：`.github/workflows/check.yml` 的 `aw-check` job 通过
   `uses: OasisSaber/TheMasterplan/.github/workflows/aw-check.yml@v1` 调用中央可重用
-  工作流，`project-check-path` 固定为 `scripts/validate.sh`
+  工作流，`project-check-path` 固定为 `scripts/ci-check.sh`（CI 入口：先安装
+  pytest/ruff 验证依赖——中央接口不安装调用方依赖——再调用权威验证入口
+  `scripts/validate.sh`）
 
 采用时本文件与 `core/`、`profiles/`、`adapters/` 组成 TheMasterplan 采用集；
 验证入口、平台声明与消费者接口按本项目实际情况记录，不复制 TheMasterplan
