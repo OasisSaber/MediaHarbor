@@ -175,9 +175,7 @@ def sanitize_url(url: str) -> str:
     try:
         parsed = urlparse(url)
         if not parsed.query:
-            return URL_REDACTION_RE.sub(
-                lambda m: m.group().split("=")[0] + "=REDACTED", url
-            )
+            return URL_REDACTION_RE.sub(lambda m: m.group().split("=")[0] + "=REDACTED", url)
         params = parse_qs(parsed.query, keep_blank_values=True)
         cleaned = {}
         for key, values in params.items():
@@ -202,9 +200,7 @@ def sanitize_url(url: str) -> str:
         redacted_url = urlunparse(parsed._replace(query=new_query))
         # Fragment may still carry credentials (?a=1#token=SECRET); fallback
         # redaction over the whole URL keeps them out of display/reports.
-        return URL_REDACTION_RE.sub(
-            lambda m: m.group().split("=")[0] + "=REDACTED", redacted_url
-        )
+        return URL_REDACTION_RE.sub(lambda m: m.group().split("=")[0] + "=REDACTED", redacted_url)
     except Exception:
         return URL_REDACTION_RE.sub(lambda m: m.group().split("=")[0] + "=REDACTED", url)
 
