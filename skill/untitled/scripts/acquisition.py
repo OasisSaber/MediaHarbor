@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from process_runner import ProcessRunner, sanitize_url
+from process_runner import ProcessRunner, sanitize_stderr, sanitize_url
 from project import (
     Candidate,
     DownloadTask,
@@ -120,7 +120,7 @@ def preflight_candidate(
     probe = probe_url(url, runner=runner)
     if probe.status != "SUCCESS":
         candidate.state = "FAILED_PROBE"
-        candidate.probe_error = sanitize_url(probe.stderr)[:200]
+        candidate.probe_error = sanitize_stderr(probe.stderr)[:200]
         candidate.rejection_reasons.append("probe-failed")
         if override:
             candidate.overridden = True

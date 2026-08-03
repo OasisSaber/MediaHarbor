@@ -113,6 +113,11 @@ def test_sanitize_redacts_credential_parameters():
     assert "AKIAEXAMPLE123" not in redacted
     assert "deadbeef" not in redacted
 
+    password_err = "https://example.com/login?password=hunter2&passwd=secret3"
+    redacted_pw = sanitize_stderr(password_err)
+    assert "hunter2" not in redacted_pw
+    assert "secret3" not in redacted_pw
+
 
 class TestYuttoContract:
     @patch("backends.yutto.resolve_yutto", return_value=None)

@@ -67,7 +67,7 @@ SENSITIVE_PARAMS = {
     "x-goog-signature",
 }
 URL_REDACTION_RE = re.compile(
-    r"(token|key|secret|auth|session|pass|sign|signature|sig|credential)=[^&\s]*",
+    r"(token|key|secret|auth|session|pass(?:word|wd)?|sign|signature|sig|credential)=[^&\s]*",
     re.IGNORECASE,
 )
 
@@ -182,7 +182,7 @@ def sanitize_url(url: str) -> str:
             key_lower = key.lower()
             if key_lower in SENSITIVE_PARAMS or any(
                 s in key_lower
-                for s in ("token", "key", "secret", "sign", "auth", "session", "credential")
+                for s in ("token", "key", "secret", "sign", "auth", "session", "credential", "pass")
             ):
                 cleaned[key] = ["REDACTED"]
             else:
