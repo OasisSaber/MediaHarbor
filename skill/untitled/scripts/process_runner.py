@@ -67,7 +67,7 @@ SENSITIVE_PARAMS = {
     "x-goog-signature",
 }
 URL_REDACTION_RE = re.compile(
-    r"(token|key|secret|auth|session|pass|sign|sig)=[^&\s]*", re.IGNORECASE
+    r"(token|key|secret|auth|session|pass|sign|sig|credential)=[^&\s]*", re.IGNORECASE
 )
 
 MAX_DISPLAY_PARAM_LENGTH = 128
