@@ -128,6 +128,11 @@ def test_sanitize_redacts_credential_parameters():
     assert "FRAGMENTSECRET" not in redacted_fragment
     assert "REDACTED" in redacted_fragment
 
+    query_fragment = "https://example.com/callback?a=1#token=QFSECRET"
+    redacted_qf = sanitize_url(query_fragment)
+    assert "QFSECRET" not in redacted_qf
+    assert "REDACTED" in redacted_qf
+
     long_nested = (
         "https://example.com/redirect?next="
         + ("a" * 100)

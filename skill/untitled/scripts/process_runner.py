@@ -199,7 +199,12 @@ def sanitize_url(url: str) -> str:
                         else f"{redacted[:MAX_DISPLAY_PARAM_LENGTH]}..."
                     )
         new_query = urlencode(cleaned, doseq=True)
-        return urlunparse(parsed._replace(query=new_query))
+        redacted_url = urlunparse(parsed._replace(query=new_query))
+        # Fragment may still carry credentials (?a=1#token=SECRET); fallback
+        # redaction over the whole URL keeps them out of display/reports.
+        return URL_REDACTION_RE.sub(
+            lambda m: m.group().split("=")[0] + "=REDACTED", redacted_url
+        )
     except Exception:
         return URL_REDACTION_RE.sub(lambda m: m.group().split("=")[0] + "=REDACTED", url)
 
