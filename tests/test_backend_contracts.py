@@ -125,9 +125,9 @@ def test_sanitize_redacts_credential_parameters():
 
     long_nested = (
         "https://example.com/redirect?next="
-        + ("a" * 120)
-        + "?token=LONGNESTEDSECRET"
-        + ("b" * 60)
+        + ("a" * 100)
+        + "?token=LONGNESTEDSECRET%26"
+        + ("b" * 40)
     )
     redacted_long = sanitize_url(long_nested)
     assert "LONGNESTEDSECRET" not in redacted_long
