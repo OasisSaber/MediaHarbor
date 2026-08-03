@@ -133,8 +133,8 @@ def test_configured_ocr_missing_is_unavailable(tmp_path):
             }
         )
     )
-    (root / "skill" / "mediaharbor").mkdir(parents=True)
-    (root / "skill" / "mediaharbor" / "SKILL.md").write_text("---\ntitle: test\n---\n")
+    (root / "skill" / "untitled").mkdir(parents=True)
+    (root / "skill" / "untitled" / "SKILL.md").write_text("---\ntitle: test\n---\n")
     import os
 
     cwd = Path.cwd()

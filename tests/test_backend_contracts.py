@@ -8,9 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-sys.path.insert(
-    0, str(Path(__file__).resolve().parent.parent / "skill" / "mediaharbor" / "scripts")
-)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skill" / "untitled" / "scripts"))
 
 from process_runner import SUCCESS, AttemptInfo, BackendResult, ProcessResult
 
@@ -34,7 +32,8 @@ def _make_file(output_dir: Path, name: str) -> Path:
 
 
 class TestStreamlinkContract:
-    def test_tool_missing_returns_backend_result(self, tmp_path):
+    @patch("backends.streamlink.resolve_streamlink", return_value=None)
+    def test_tool_missing_returns_backend_result(self, mock_resolve, tmp_path):
         from backends.streamlink import run_streamlink
 
         result = run_streamlink("https://example.com/live", tmp_path)
@@ -94,7 +93,8 @@ def test_backend_result_bounds_and_sanitizes_stderr():
 
 
 class TestYuttoContract:
-    def test_tool_missing_returns_backend_result(self, tmp_path):
+    @patch("backends.yutto.resolve_yutto", return_value=None)
+    def test_tool_missing_returns_backend_result(self, mock_resolve, tmp_path):
         from backends.yutto import run_yutto
 
         result = run_yutto("https://www.bilibili.com/video/BV1xx", tmp_path)
@@ -113,7 +113,8 @@ class TestNm3u8dlreContract:
 
 
 class TestGalleryDlContract:
-    def test_tool_missing_returns_backend_result(self, tmp_path):
+    @patch("backends.gallery_dl.resolve_gallery_dl", return_value=None)
+    def test_tool_missing_returns_backend_result(self, mock_resolve, tmp_path):
         from backends.gallery_dl import run_gallery_dl
 
         result = run_gallery_dl("https://twitter.com/user/status/123", tmp_path)

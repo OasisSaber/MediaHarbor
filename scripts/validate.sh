@@ -5,7 +5,7 @@ FAILED=0
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_DIR" || exit 1
 
-echo "=== MediaHarbor Validation ==="
+echo "=== Untitled Validation ==="
 echo ""
 
 # ---- Check 1: Ruff format ----
@@ -40,7 +40,7 @@ echo ""
 
 # ---- Check 4: locate_root smoke test ----
 echo "--- Check 4: locate_root.py smoke test ---"
-if python skill/mediaharbor/scripts/locate_root.py --json 2>&1; then
+if python skill/untitled/scripts/locate_root.py --json 2>&1; then
     echo "  locate_root.py OK."
 else
     echo "  locate_root.py failed."
@@ -50,7 +50,7 @@ echo ""
 
 # ---- Check 5: check_tools smoke test ----
 echo "--- Check 5: check_tools.py smoke test ---"
-if python skill/mediaharbor/scripts/check_tools.py --json 2>&1; then
+if python skill/untitled/scripts/check_tools.py --json 2>&1; then
     echo "  check_tools.py OK."
 else
     echo "  check_tools.py failed."

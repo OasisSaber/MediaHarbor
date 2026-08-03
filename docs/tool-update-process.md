@@ -1,6 +1,6 @@
 # Tool Update Process
 
-This document describes how MediaHarbor tools are packaged, verified, published, and updated. Tools are hosted as zip assets of the MediaHarbor GitHub Release `tools-windows-x64-v1`; the authoritative inventory is `tools-manifest.json`.
+This document describes how Untitled tools are packaged, verified, published, and updated. Tools are hosted as zip assets of the Untitled GitHub Release `tools-windows-x64-v1`; the authoritative inventory is `tools-manifest.json`.
 
 ## Principle
 
@@ -14,7 +14,7 @@ This document describes how MediaHarbor tools are packaged, verified, published,
 1. **Download the new official binary/zip** from upstream (e.g. yt-dlp GitHub release, BtbN FFmpeg-Builds, N_m3u8DL-RE release).
 2. **Verify locally on Windows x64**:
    - `yt-dlp.exe --version` and a real probe: `yt-dlp --dump-json --skip-download <public url>`
-   - `ffmpeg -version`, `ffprobe -version`, and a real validation pass through MediaHarbor (`python mediaharbor.py run ...`)
+   - `ffmpeg -version`, `ffprobe -version`, and a real validation pass through Untitled (`python untitled.py run ...`)
    - `N_m3u8DL-RE --version`
    - Run the full validation suite: `powershell -ExecutionPolicy Bypass -File scripts/validate.ps1`
 3. **Repackage as a plain zip** laid out relative to `download-tools/` (e.g. `yt-dlp/yt-dlp.exe`, `ffmpeg/ffmpeg.exe` + `ffmpeg/ffprobe.exe` + `ffmpeg/LICENSE.txt`). Include the tool's license file.

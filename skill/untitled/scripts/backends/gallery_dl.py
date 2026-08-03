@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 
-from _common import resolve_registered_tool
+from _common import resolve_registered_command
 from process_runner import (
     SUCCESS,
     BackendResult,
@@ -13,18 +12,14 @@ from process_runner import (
 )
 
 
-def resolve_gallery_dl(allow_system_path: bool = False) -> Path | None:
-    try:
-        result = resolve_registered_tool("gallery-dl", allow_system_path=allow_system_path)
-        if result:
-            return result
-    except Exception:
-        pass
-    if allow_system_path:
-        system = shutil.which("gallery-dl")
-        if system:
-            return Path(system)
-    return None
+def resolve_gallery_dl() -> list[str] | None:
+    return resolve_registered_command("gallery-dl")
+
+
+def _prefix(command: object) -> list[str]:
+    if isinstance(command, (list, tuple)):
+        return [str(item) for item in command]
+    return [str(command)]
 
 
 def run_gallery_dl(
@@ -33,17 +28,13 @@ def run_gallery_dl(
     runner: ProcessRunner | None = None,
     max_attempts: int | None = None,
 ) -> BackendResult:
-    if runner is None:
-        runner = ProcessRunner()
+    runner = runner or ProcessRunner()
     tool = resolve_gallery_dl()
     if tool is None:
-        return BackendResult(
-            status="TOOL_MISSING",
-            stderr="gallery-dl not found",
-        )
+        return BackendResult(status="TOOL_MISSING", stderr="gallery-dl not found")
     output_dir.mkdir(parents=True, exist_ok=True)
     before = snapshot_output_files(output_dir)
-    cmd = [str(tool), url, "-d", str(output_dir)]
+    cmd = [*_prefix(tool), url, "-d", str(output_dir)]
     result = runner.run(cmd, backend="gallery-dl", check_drm=True, max_attempts=max_attempts)
     output_paths = discover_output_files(output_dir, before) if result.status == SUCCESS else []
     return BackendResult.from_process(result, output_paths)

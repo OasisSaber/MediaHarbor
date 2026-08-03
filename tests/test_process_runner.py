@@ -3,9 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(
-    0, str(Path(__file__).resolve().parent.parent / "skill" / "mediaharbor" / "scripts")
-)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skill" / "untitled" / "scripts"))
 from process_runner import ProcessRunner
 
 

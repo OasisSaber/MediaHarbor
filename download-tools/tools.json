@@ -3,53 +3,80 @@
   "platforms_note": "Windows x64 is the only officially supported platform.",
   "tools": {
     "yt-dlp": {
-      "roles": ["probe", "vod", "playlist", "subtitle", "metadata"],
+      "roles": [
+        "probe",
+        "vod",
+        "playlist",
+        "subtitle",
+        "metadata"
+      ],
       "required": true,
       "platforms": {
         "windows-x64": "yt-dlp/yt-dlp.exe"
-      }
+      },
+      "kind": "binary"
     },
     "ffmpeg": {
-      "roles": ["merge", "convert"],
+      "roles": [
+        "merge",
+        "convert"
+      ],
       "required": true,
       "platforms": {
         "windows-x64": "ffmpeg/ffmpeg.exe"
-      }
+      },
+      "kind": "binary"
     },
     "ffprobe": {
-      "roles": ["validate"],
+      "roles": [
+        "validate"
+      ],
       "required": true,
       "platforms": {
         "windows-x64": "ffmpeg/ffprobe.exe"
-      }
+      },
+      "kind": "binary"
     },
     "yutto": {
-      "roles": ["bilibili"],
+      "roles": [
+        "bilibili"
+      ],
       "required": false,
-      "platforms": {
-        "windows-x64": "yutto/yutto.exe"
-      }
+      "platforms": {},
+      "kind": "python-module",
+      "module": "yutto"
     },
     "streamlink": {
-      "roles": ["live"],
+      "roles": [
+        "live"
+      ],
       "required": false,
-      "platforms": {
-        "windows-x64": "streamlink/streamlink.exe"
-      }
+      "platforms": {},
+      "kind": "python-module",
+      "module": "streamlink"
     },
     "n-m3u8dl-re": {
-      "roles": ["hls", "dash", "mss"],
+      "roles": [
+        "hls",
+        "dash",
+        "mss"
+      ],
       "required": false,
       "platforms": {
         "windows-x64": "N_m3u8DL-RE/N_m3u8DL-RE.exe"
-      }
+      },
+      "kind": "binary"
     },
     "gallery-dl": {
-      "roles": ["social", "gallery", "post-media"],
+      "roles": [
+        "social",
+        "gallery",
+        "post-media"
+      ],
       "required": false,
-      "platforms": {
-        "windows-x64": "gallery-dl/gallery-dl.exe"
-      }
+      "platforms": {},
+      "kind": "python-module",
+      "module": "gallery_dl"
     }
   }
 }

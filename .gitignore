@@ -9,6 +9,8 @@ build/
 *.egg-info/
 
 output/
+migration-backups/
+.reasonix/
 
 download-tools/*/
 !download-tools/README.md

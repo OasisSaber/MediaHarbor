@@ -14,14 +14,34 @@ from project import (
     save_project,
 )
 
+_REFRESHABLE_TASK_STATES = {"PENDING", "FAILED", "SKIPPED"}
+
+
+def _refresh_execution_url(project: Project, display_url: str, execution_url: str) -> bool:
+    """Refresh a secret-bearing URL without duplicating the sanitized task identity."""
+    changed = False
+    for task in project.tasks:
+        if task.url != display_url or task.status not in _REFRESHABLE_TASK_STATES:
+            continue
+        if task.execution_url != execution_url:
+            task.execution_url = execution_url
+            changed = True
+    for candidate in project.candidates:
+        if candidate.display_url == display_url and candidate.execution_url != execution_url:
+            candidate.execution_url = execution_url
+            changed = True
+    return changed
+
 
 def add_candidate(project_name: str, url: str, node_title: str = "") -> Project | None:
     project = load_project(project_name)
     if project is None:
         return None
     display_url = sanitize_url(url)
-    existing = [t for t in project.tasks if t.url == display_url]
+    existing = [task for task in project.tasks if task.url == display_url]
     if existing:
+        if _refresh_execution_url(project, display_url, url):
+            save_project(project)
         return project
     if node_title:
         for node in project.story_nodes:
@@ -83,6 +103,12 @@ def preflight_candidate(
     display_url = sanitize_url(url)
     for existing in project.candidates:
         if existing.display_url == display_url:
+            changed = _refresh_execution_url(project, display_url, url)
+            if existing.execution_url != url:
+                existing.execution_url = url
+                changed = True
+            if changed:
+                save_project(project)
             return existing
 
     candidate = Candidate(

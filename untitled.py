@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Minimal agent-facing CLI for MediaHarbor (Windows x64, local single-user).
+"""Minimal agent-facing CLI for Untitled (Windows x64, local single-user).
 
 This is the stable entry point referenced by SKILL.md and README. It only
 wraps existing public workflow functions; it does not reimplement routing or
@@ -7,14 +7,14 @@ orchestration. All commands output JSON with the fixed top-level fields
 ``ok``, ``status``, ``data``, ``error``.
 
 Usage:
-    python mediaharbor.py check-tools [--json]
-    python mediaharbor.py project-create <name> [--json]
-    python mediaharbor.py story-node-add <project> <title> [--description <text>] [--json]
-    python mediaharbor.py story-node-list <project> [--json]
-    python mediaharbor.py candidate-add <project> <url> [--json]
-    python mediaharbor.py process <project> [--json]
-    python mediaharbor.py status <project> [--json]
-    python mediaharbor.py run --project <name> --url <url> [--json]
+    python untitled.py check-tools [--json]
+    python untitled.py project-create <name> [--json]
+    python untitled.py story-node-add <project> <title> [--description <text>] [--json]
+    python untitled.py story-node-list <project> [--json]
+    python untitled.py candidate-add <project> <url> [--json]
+    python untitled.py process <project> [--json]
+    python untitled.py status <project> [--json]
+    python untitled.py run --project <name> --url <url> [--json]
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ import json
 import sys
 from pathlib import Path
 
-SCRIPTS_DIR = Path(__file__).resolve().parent / "skill" / "mediaharbor" / "scripts"
+SCRIPTS_DIR = Path(__file__).resolve().parent / "skill" / "untitled" / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
@@ -248,9 +248,9 @@ def cmd_story_node_list(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="mediaharbor",
+        prog="untitled",
         description=(
-            "MediaHarbor minimal agent-facing workflow CLI (Windows x64, local single-user)."
+            "Untitled minimal agent-facing workflow CLI (Windows x64, local single-user)."
         ),
     )
     subparsers = parser.add_subparsers(dest="command", required=True)

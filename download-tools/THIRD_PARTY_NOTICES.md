@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-MediaHarbor works with the following third-party tools. Tools with an official standalone Windows binary are distributed as zip assets of the MediaHarbor release `tools-windows-x64-v1`; others are installed via pip. All tools are open source and free to use.
+Untitled works with the following third-party tools. Tools with an official standalone Windows binary are distributed as zip assets of the Untitled release `tools-windows-x64-v1`; others are installed via pip. All tools are open source and free to use.
 
 ## Downloader Tools
 
@@ -21,8 +21,8 @@ MediaHarbor works with the following third-party tools. Tools with an official s
 
 ## Usage
 
-Run `python scripts/fetch_tools.py` to fetch the shipped tools into `download-tools/`. MediaHarbor never downloads, installs, or upgrades tools implicitly at runtime; fetching is an explicit script action.
+Run `python scripts/fetch_tools.py` to fetch the shipped tools into `download-tools/`. Untitled never downloads, installs, or upgrades tools implicitly at runtime; fetching is an explicit script action.
 
-## License MediaHarbor
+## License Untitled
 
-MediaHarbor itself is licensed under the MIT License. See `../LICENSE`.
+Untitled itself is licensed under the MIT License. See `../LICENSE`.

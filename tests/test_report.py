@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "skill" / "mediaharbor" / "scripts"))
+sys.path.insert(0, str(REPO_ROOT / "skill" / "untitled" / "scripts"))
 
 
 def _setup_temp_project(tmp: str):
@@ -18,8 +18,8 @@ def _setup_temp_project(tmp: str):
         '"platforms": {"windows-x64": "dummy/dummy.exe"}}}}'
     )
     (root / "download-tools" / "tools.json").write_text(tools_json)
-    (root / "skill" / "mediaharbor").mkdir(parents=True, exist_ok=True)
-    (root / "skill" / "mediaharbor" / "SKILL.md").write_text(
+    (root / "skill" / "untitled").mkdir(parents=True, exist_ok=True)
+    (root / "skill" / "untitled" / "SKILL.md").write_text(
         "---\ntitle: test\n---\n", encoding="utf-8"
     )
 
