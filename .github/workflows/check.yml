@@ -12,6 +12,39 @@ permissions:
   pull-requests: read
 
 jobs:
+  # Ubuntu 纯 Python 验证。job 名称 check-ubuntu 由仓库 ruleset
+  # main-protection 的 required status check 固定，不得改名或删除。
+  # MediaHarbor 正式支持 Windows x64；Ubuntu 仅证明纯 Python 测试可运行。
+  check-ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dev dependencies
+        run: python -m pip install pytest ruff
+
+      - name: Ruff format check
+        run: python -m ruff format --check .
+
+      - name: Ruff lint check
+        run: python -m ruff check .
+
+      - name: Pytest
+        run: python -m pytest -v
+
+      - name: Smoke test locate_root
+        run: python skill/mediaharbor/scripts/locate_root.py --json
+
+      - name: Smoke test check_tools
+        run: python skill/mediaharbor/scripts/check_tools.py --json
+
   # 中央 TheMasterplan 可重用工作流：验证消费者契约（根部 AGENTS.md 存在、
   # project-check-path 非空且受 Git 跟踪）、PR 正文契约，并运行项目 CI 验证
   # 入口 scripts/ci-check.sh（安装 pytest/ruff 后调用权威入口 scripts/validate.sh）。
