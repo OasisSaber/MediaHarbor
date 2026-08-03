@@ -123,6 +123,17 @@ def test_sanitize_redacts_credential_parameters():
     assert "NESTEDSECRET" not in redacted_nested
     assert "REDACTED" in redacted_nested
 
+    long_nested = (
+        "https://example.com/redirect?next="
+        + ("a" * 120)
+        + "?token=LONGNESTEDSECRET"
+        + ("b" * 60)
+    )
+    redacted_long = sanitize_url(long_nested)
+    assert "LONGNESTEDSECRET" not in redacted_long
+    assert "token=" not in redacted_long
+    assert "..." in redacted_long
+
 
 class TestYuttoContract:
     @patch("backends.yutto.resolve_yutto", return_value=None)

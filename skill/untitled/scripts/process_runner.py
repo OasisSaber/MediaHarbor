@@ -186,14 +186,16 @@ def sanitize_url(url: str) -> str:
             ):
                 cleaned[key] = ["REDACTED"]
             else:
-                cleaned[key] = [
-                    URL_REDACTION_RE.sub(
+                cleaned[key] = []
+                for value in values:
+                    redacted = URL_REDACTION_RE.sub(
                         lambda m: m.group().split("=")[0] + "=REDACTED", value
                     )
-                    if len(value) <= MAX_DISPLAY_PARAM_LENGTH
-                    else f"{value[:MAX_DISPLAY_PARAM_LENGTH]}..."
-                    for value in values
-                ]
+                    cleaned[key].append(
+                        redacted
+                        if len(redacted) <= MAX_DISPLAY_PARAM_LENGTH
+                        else f"{redacted[:MAX_DISPLAY_PARAM_LENGTH]}..."
+                    )
         new_query = urlencode(cleaned, doseq=True)
         return urlunparse(parsed._replace(query=new_query))
     except Exception:
