@@ -3,7 +3,7 @@ $Failed = 0
 $RepoDir = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 Set-Location $RepoDir
 
-Write-Host "=== MediaHarbor Validation ===" -ForegroundColor Cyan
+Write-Host "=== Untitled Validation ===" -ForegroundColor Cyan
 Write-Host ""
 
 # Check 1: Ruff format
@@ -41,7 +41,7 @@ Write-Host ""
 
 # Check 4: locate_root smoke test
 Write-Host "--- Check 4: locate_root.py smoke test ---" -ForegroundColor Yellow
-python skill/mediaharbor/scripts/locate_root.py --json
+python skill/untitled/scripts/locate_root.py --json
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  locate_root.py failed." -ForegroundColor Red
     $Failed++
@@ -52,7 +52,7 @@ Write-Host ""
 
 # Check 5: check_tools smoke test
 Write-Host "--- Check 5: check_tools.py smoke test ---" -ForegroundColor Yellow
-python skill/mediaharbor/scripts/check_tools.py --json
+python skill/untitled/scripts/check_tools.py --json
 if ($LASTEXITCODE -ne 0) {
     Write-Host "  check_tools.py failed." -ForegroundColor Red
     $Failed++

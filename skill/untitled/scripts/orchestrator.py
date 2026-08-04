@@ -526,6 +526,17 @@ def _process_started_task(
         shutil.rmtree(staging_dir, ignore_errors=True)
 
 
+def _durable_completed_task(project_name: str, url: str) -> bool:
+    """Return true only when project state and all recorded outputs are durable."""
+    project = load_project(project_name)
+    if project is None:
+        return False
+    task = next((item for item in project.tasks if item.url == url), None)
+    if task is None or task.status != "COMPLETED" or not task.output_paths:
+        return False
+    return all(Path(output_path).is_file() for output_path in task.output_paths)
+
+
 def process_pending(project_name: str, runner: ProcessRunner | None = None) -> dict:
     if runner is None:
         runner = ProcessRunner(timeout=600, max_retries=2)
@@ -569,14 +580,15 @@ def process_pending(project_name: str, runner: ProcessRunner | None = None) -> d
             try:
                 fail_task(project_name, task.url, f"INTERNAL_ERROR: {safe_error}")
                 succeeded = False
-            except ValueError:
-                succeeded = True
+            except ValueError as transition_error:
+                succeeded = _durable_completed_task(project_name, task.url)
                 entry = {
                     "url": task.url,
                     "backend": None,
-                    "status": "SUCCESS",
+                    "status": "SUCCESS_RECOVERED" if succeeded else "INTERNAL_ERROR",
                     "error": safe_error,
-                    "source_pending": True,
+                    "state_error": sanitize_stderr(str(transition_error))[:200],
+                    "state_reconciliation_required": not succeeded,
                 }
             else:
                 entry = {

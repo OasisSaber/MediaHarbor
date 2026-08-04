@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Fetch MediaHarbor download tools from this repository's GitHub Release.
+"""Fetch Untitled download tools from this repository's GitHub Release.
 
-Tools are distributed as zip assets of the MediaHarbor release
+Tools are distributed as zip assets of the Untitled release
 ``tools-windows-x64-v1`` (see ``tools-manifest.json``). Each zip contains
 files laid out relative to the ``download-tools/`` directory, so extraction
 places them directly (e.g. ``yt-dlp/yt-dlp.exe``).
@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import shutil
 import sys
@@ -135,7 +136,8 @@ def extract_zip(archive_path: Path, target_root: Path, provides: list[str]) -> N
 
 def tool_installed(root: Path, entry: dict) -> bool:
     if entry["kind"] == "pip":
-        return False
+        module = entry.get("module") or entry["package"].replace("-", "_")
+        return importlib.util.find_spec(module) is not None
     for member in entry["provides"]:
         if not (root / TOOLS_DIR / member).is_file():
             return False
@@ -145,9 +147,9 @@ def tool_installed(root: Path, entry: dict) -> bool:
 def fetch_tool(root: Path, name: str, entry: dict, force: bool = False) -> str:
     if entry["kind"] == "pip":
         return (
-            f"tool '{name}' has no official standalone Windows binary; "
-            f"install with `python -m pip install {entry['package']}` and "
-            f"configure its path in download-tools/tools.json (see docs/tool-update-process.md)"
+            f"tool '{name}' is Python-module backed; install it into the current "
+            f"interpreter with `{sys.executable} -m pip install {entry['package']}`; "
+            f"then rerun `python untitled.py check-tools`"
         )
     if tool_installed(root, entry) and not force:
         return f"tool '{name}' already installed (use --force to reinstall)"
@@ -245,10 +247,10 @@ def verify_manifest(root: Path) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Fetch MediaHarbor tools from the project release")
+    parser = argparse.ArgumentParser(description="Fetch Untitled tools from the project release")
     parser.add_argument("--tool", help="Only fetch this tool (default: all missing zip tools)")
     parser.add_argument("--force", action="store_true", help="Reinstall even if present")
-    parser.add_argument("--root", type=Path, default=DEFAULT_ROOT, help="MediaHarbor root")
+    parser.add_argument("--root", type=Path, default=DEFAULT_ROOT, help="Untitled root")
     parser.add_argument("--check", action="store_true", help="Report tool status, do not download")
     parser.add_argument(
         "--check-updates", action="store_true", help="Query upstream latest versions"
@@ -292,7 +294,7 @@ def main(argv: list[str] | None = None) -> int:
         if not args.tool and not failed:
             import sys as _sys
 
-            _sys.path.insert(0, str((args.root / "skill" / "mediaharbor" / "scripts").resolve()))
+            _sys.path.insert(0, str((args.root / "skill" / "untitled" / "scripts").resolve()))
             from _common import check_tools, load_registry
 
             registry = load_registry(args.root)

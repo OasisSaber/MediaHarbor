@@ -22,8 +22,8 @@ def _setup_workspace(tmp: str) -> Path:
     (root / "AGENT_READ_ME_FIRST.md").write_text("")
     (root / "download-tools").mkdir(parents=True, exist_ok=True)
     (root / "download-tools" / "tools.json").write_text(TOOLS_JSON)
-    (root / "skill" / "mediaharbor").mkdir(parents=True, exist_ok=True)
-    (root / "skill" / "mediaharbor" / "SKILL.md").write_text("---\ntitle: test\n---\n")
+    (root / "skill" / "untitled").mkdir(parents=True, exist_ok=True)
+    (root / "skill" / "untitled" / "SKILL.md").write_text("---\ntitle: test\n---\n")
     return root
 
 
@@ -62,8 +62,10 @@ def _make_zip(path: Path, entries: dict[str, bytes]) -> None:
 
 
 def _run(root: Path, *args: str) -> subprocess.CompletedProcess:
+    # -S: skip site-packages so python-module tool detection (find_spec)
+    # sees a clean interpreter regardless of what the developer installed.
     return subprocess.run(
-        [sys.executable, str(FETCH), "--root", str(root), *args],
+        [sys.executable, "-S", str(FETCH), "--root", str(root), *args],
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),

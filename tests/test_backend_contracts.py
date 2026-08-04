@@ -8,9 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-sys.path.insert(
-    0, str(Path(__file__).resolve().parent.parent / "skill" / "mediaharbor" / "scripts")
-)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skill" / "untitled" / "scripts"))
 
 from process_runner import SUCCESS, AttemptInfo, BackendResult, ProcessResult
 
@@ -34,7 +32,8 @@ def _make_file(output_dir: Path, name: str) -> Path:
 
 
 class TestStreamlinkContract:
-    def test_tool_missing_returns_backend_result(self, tmp_path):
+    @patch("backends.streamlink.resolve_streamlink", return_value=None)
+    def test_tool_missing_returns_backend_result(self, mock_resolve, tmp_path):
         from backends.streamlink import run_streamlink
 
         result = run_streamlink("https://example.com/live", tmp_path)
@@ -93,8 +92,62 @@ def test_backend_result_bounds_and_sanitizes_stderr():
     assert len(result.stderr) <= 2000
 
 
+def test_sanitize_redacts_credential_parameters():
+    from process_runner import sanitize_stderr, sanitize_url
+
+    url = (
+        "https://storage.example.com/video.mp4?"
+        "X-Goog-Credential=svc%40proj.iam.gserviceaccount.com%2F2026%2F08%2F04%2Fauto"
+        "&X-Goog-Signature=abc123signature"
+    )
+    cleaned = sanitize_url(url)
+    assert "svc%40proj.iam" not in cleaned
+    assert "abc123signature" not in cleaned
+    assert "REDACTED" in cleaned
+
+    err = (
+        "failed fetching https://example.com/v?"
+        "x-amz-credential=AKIAEXAMPLE123&x-amz-signature=deadbeef"
+    )
+    redacted = sanitize_stderr(err)
+    assert "AKIAEXAMPLE123" not in redacted
+    assert "deadbeef" not in redacted
+
+    password_err = "https://example.com/login?password=hunter2&passwd=secret3"
+    redacted_pw = sanitize_stderr(password_err)
+    assert "hunter2" not in redacted_pw
+    assert "secret3" not in redacted_pw
+
+    nested = "https://example.com/redirect?next=https://cdn.example.com/v?token=NESTEDSECRET"
+    redacted_nested = sanitize_url(nested)
+    assert "NESTEDSECRET" not in redacted_nested
+    assert "REDACTED" in redacted_nested
+
+    fragment = "https://example.com/callback#token=FRAGMENTSECRET&x=1"
+    redacted_fragment = sanitize_url(fragment)
+    assert "FRAGMENTSECRET" not in redacted_fragment
+    assert "REDACTED" in redacted_fragment
+
+    query_fragment = "https://example.com/callback?a=1#token=QFSECRET"
+    redacted_qf = sanitize_url(query_fragment)
+    assert "QFSECRET" not in redacted_qf
+    assert "REDACTED" in redacted_qf
+
+    long_nested = (
+        "https://example.com/redirect?next="
+        + ("a" * 100)
+        + "?token=LONGNESTEDSECRET%26"
+        + ("b" * 40)
+    )
+    redacted_long = sanitize_url(long_nested)
+    assert "LONGNESTEDSECRET" not in redacted_long
+    assert "token=" not in redacted_long
+    assert "..." in redacted_long
+
+
 class TestYuttoContract:
-    def test_tool_missing_returns_backend_result(self, tmp_path):
+    @patch("backends.yutto.resolve_yutto", return_value=None)
+    def test_tool_missing_returns_backend_result(self, mock_resolve, tmp_path):
         from backends.yutto import run_yutto
 
         result = run_yutto("https://www.bilibili.com/video/BV1xx", tmp_path)
@@ -113,7 +166,8 @@ class TestNm3u8dlreContract:
 
 
 class TestGalleryDlContract:
-    def test_tool_missing_returns_backend_result(self, tmp_path):
+    @patch("backends.gallery_dl.resolve_gallery_dl", return_value=None)
+    def test_tool_missing_returns_backend_result(self, mock_resolve, tmp_path):
         from backends.gallery_dl import run_gallery_dl
 
         result = run_gallery_dl("https://twitter.com/user/status/123", tmp_path)

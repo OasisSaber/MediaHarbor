@@ -67,7 +67,8 @@ SENSITIVE_PARAMS = {
     "x-goog-signature",
 }
 URL_REDACTION_RE = re.compile(
-    r"(token|key|secret|auth|session|pass|sign|sig)=[^&\s]*", re.IGNORECASE
+    r"(token|key|secret|auth|session|pass(?:word|wd)?|sign|signature|sig|credential)=[^&\s]*",
+    re.IGNORECASE,
 )
 
 MAX_DISPLAY_PARAM_LENGTH = 128
@@ -174,24 +175,32 @@ def sanitize_url(url: str) -> str:
     try:
         parsed = urlparse(url)
         if not parsed.query:
-            return url
+            return URL_REDACTION_RE.sub(lambda m: m.group().split("=")[0] + "=REDACTED", url)
         params = parse_qs(parsed.query, keep_blank_values=True)
         cleaned = {}
         for key, values in params.items():
             key_lower = key.lower()
             if key_lower in SENSITIVE_PARAMS or any(
-                s in key_lower for s in ("token", "key", "secret", "sign", "auth", "session")
+                s in key_lower
+                for s in ("token", "key", "secret", "sign", "auth", "session", "credential", "pass")
             ):
                 cleaned[key] = ["REDACTED"]
             else:
-                cleaned[key] = [
-                    value
-                    if len(value) <= MAX_DISPLAY_PARAM_LENGTH
-                    else f"{value[:MAX_DISPLAY_PARAM_LENGTH]}..."
-                    for value in values
-                ]
+                cleaned[key] = []
+                for value in values:
+                    redacted = URL_REDACTION_RE.sub(
+                        lambda m: m.group().split("=")[0] + "=REDACTED", value
+                    )
+                    cleaned[key].append(
+                        redacted
+                        if len(redacted) <= MAX_DISPLAY_PARAM_LENGTH
+                        else f"{redacted[:MAX_DISPLAY_PARAM_LENGTH]}..."
+                    )
         new_query = urlencode(cleaned, doseq=True)
-        return urlunparse(parsed._replace(query=new_query))
+        redacted_url = urlunparse(parsed._replace(query=new_query))
+        # Fragment may still carry credentials (?a=1#token=SECRET); fallback
+        # redaction over the whole URL keeps them out of display/reports.
+        return URL_REDACTION_RE.sub(lambda m: m.group().split("=")[0] + "=REDACTED", redacted_url)
     except Exception:
         return URL_REDACTION_RE.sub(lambda m: m.group().split("=")[0] + "=REDACTED", url)
 

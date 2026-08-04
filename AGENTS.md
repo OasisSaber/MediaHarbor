@@ -1,4 +1,4 @@
-# MediaHarbor Agent Workflow
+# Untitled Agent Workflow
 
 > 本文件是本仓库唯一入口：定义加载顺序与分域权威，不复制规则正文。
 > 规则分布：
@@ -11,7 +11,7 @@
 
 ## 项目事实
 
-- 项目名：MediaHarbor
+- 项目名：Untitled
 - 项目目标：维护一个工作区内便携式 Agent Skill 工具包，帮助 Agent 根据已有文案检索、下载、验证并整理视频素材
 - 技术栈：Python 3.11+、外部下载工具 CLI、FFmpeg/ffprobe、JSON/JSONL、Markdown
 - 默认分支：`main`

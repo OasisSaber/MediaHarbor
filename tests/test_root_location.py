@@ -10,8 +10,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 def _setup_tmp(root: Path):
     (root / "AGENT_READ_ME_FIRST.md").write_text("")
-    (root / "skill" / "mediaharbor").mkdir(parents=True, exist_ok=True)
-    (root / "skill" / "mediaharbor" / "SKILL.md").write_text(
+    (root / "skill" / "untitled").mkdir(parents=True, exist_ok=True)
+    (root / "skill" / "untitled" / "SKILL.md").write_text(
         "---\ntitle: test\n---\n", encoding="utf-8"
     )
     (root / "download-tools").mkdir(parents=True, exist_ok=True)
@@ -22,7 +22,7 @@ def test_locate_root_from_script_dir():
         [sys.executable, "locate_root.py", "--json"],
         capture_output=True,
         text=True,
-        cwd=str(REPO_ROOT / "skill" / "mediaharbor" / "scripts"),
+        cwd=str(REPO_ROOT / "skill" / "untitled" / "scripts"),
     )
     assert result.returncode == 0, f"stderr: {result.stderr}"
     import json
@@ -37,7 +37,7 @@ def test_locate_root_independent_of_cwd():
         result = subprocess.run(
             [
                 sys.executable,
-                str(REPO_ROOT / "skill" / "mediaharbor" / "scripts" / "locate_root.py"),
+                str(REPO_ROOT / "skill" / "untitled" / "scripts" / "locate_root.py"),
                 "--json",
             ],
             capture_output=True,
@@ -63,8 +63,8 @@ def test_locate_root_with_spaces_in_path():
         )
         (spaced_dir / "download-tools" / "tools.json").write_text(dummy_json)
 
-        src_scripts = REPO_ROOT / "skill" / "mediaharbor" / "scripts"
-        scripts_dir = spaced_dir / "skill" / "mediaharbor" / "scripts"
+        src_scripts = REPO_ROOT / "skill" / "untitled" / "scripts"
+        scripts_dir = spaced_dir / "skill" / "untitled" / "scripts"
         scripts_dir.mkdir(parents=True, exist_ok=True)
         for fname in ["_common.py", "locate_root.py"]:
             (scripts_dir / fname).write_text(
@@ -88,8 +88,8 @@ def test_rejects_false_root():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         (root / "AGENT_READ_ME_FIRST.md").write_text("")
-        src = REPO_ROOT / "skill" / "mediaharbor" / "scripts"
-        scripts_dir = root / "skill" / "mediaharbor" / "scripts"
+        src = REPO_ROOT / "skill" / "untitled" / "scripts"
+        scripts_dir = root / "skill" / "untitled" / "scripts"
         scripts_dir.mkdir(parents=True)
         (scripts_dir / "_common.py").write_text(
             (src / "_common.py").read_text(encoding="utf-8"), encoding="utf-8"

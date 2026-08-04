@@ -14,7 +14,7 @@ permissions:
 jobs:
   # Ubuntu 纯 Python 验证。job 名称 check-ubuntu 由仓库 ruleset
   # main-protection 的 required status check 固定，不得改名或删除。
-  # MediaHarbor 正式支持 Windows x64；Ubuntu 仅证明纯 Python 测试可运行。
+  # Untitled 正式支持 Windows x64；Ubuntu 仅证明纯 Python 测试可运行。
   check-ubuntu:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -40,16 +40,16 @@ jobs:
         run: python -m pytest -v
 
       - name: Smoke test locate_root
-        run: python skill/mediaharbor/scripts/locate_root.py --json
+        run: python skill/untitled/scripts/locate_root.py --json
 
       - name: Smoke test check_tools
-        run: python skill/mediaharbor/scripts/check_tools.py --json
+        run: python skill/untitled/scripts/check_tools.py --json
 
   # 中央 TheMasterplan 可重用工作流：验证消费者契约（根部 AGENTS.md 存在、
   # project-check-path 非空且受 Git 跟踪）、PR 正文契约，并运行项目 CI 验证
   # 入口 scripts/ci-check.sh（安装 pytest/ruff 后调用权威入口 scripts/validate.sh）。
   # 真实 check-run 名称：aw-check。该 Ubuntu job 仅证明纯 Python 测试可运行；
-  # MediaHarbor 正式支持 Windows x64，不是 Linux 平台支持声明。
+  # Untitled 正式支持 Windows x64，不是 Linux 平台支持声明。
   aw-check:
     uses: OasisSaber/TheMasterplan/.github/workflows/aw-check.yml@v1
     with:
@@ -82,10 +82,10 @@ jobs:
         run: python -m pytest -v
 
       - name: Smoke test locate_root
-        run: python skill/mediaharbor/scripts/locate_root.py --json
+        run: python skill/untitled/scripts/locate_root.py --json
 
       - name: Smoke test check_tools
-        run: python skill/mediaharbor/scripts/check_tools.py --json
+        run: python skill/untitled/scripts/check_tools.py --json
 
       - name: PowerShell validation
         run: powershell -ExecutionPolicy Bypass -File scripts/validate.ps1

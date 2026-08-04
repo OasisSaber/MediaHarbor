@@ -1,26 +1,26 @@
 ---
-name: mediaharbor
-description: Collect video editing materials for an existing script with MediaHarbor: analyze the script for people, events, years, locations and visual needs, generate multi-strategy search terms, search candidate video pages (default Bilibili and YouTube), enqueue candidate URLs, download through local tools, ffprobe-validate, archive, and hand off to the human editor. Trigger when the user provides a script or copy and asks to find, download, or collect video materials, or explicitly activates MediaHarbor.
+name: untitled
+description: Collect video editing materials for an existing script with Untitled: analyze the script for people, events, years, locations and visual needs, generate multi-strategy search terms, search candidate video pages (default Bilibili and YouTube), enqueue candidate URLs, download through local tools, ffprobe-validate, archive, and hand off to the human editor. Trigger when the user provides a script or copy and asks to find, download, or collect video materials, or explicitly activates Untitled.
 ---
 
-# MediaHarbor Skill
+# Untitled Skill
 
 ## Trigger
 
-The human provides an existing script or text and asks to find matching video materials, OR the human explicitly activates MediaHarbor for material collection.
+The human provides an existing script or text and asks to find matching video materials, OR the human explicitly activates Untitled for material collection.
 
 ## Scope and Installation
 
-- MediaHarbor is a **local, single-user, Windows x64 first** agent-skill source repository. Current official platform: **Windows x64 only**.
+- Untitled is a **local, single-user, Windows x64 first** agent-skill source repository. Current official platform: **Windows x64 only**.
 - Runtime requirements: Windows x64, **Python 3.11+**, and local third-party tools configured per `download-tools/tools.json`.
 - Deployment: clone the whole repository into the agent workspace (no pip install, no build step).
-- Tools: verified open-source tools are distributed as zip assets of the MediaHarbor GitHub Release (`tools-windows-x64-v1`) and fetched with `python scripts/fetch_tools.py` on first use. The script downloads each zip from the project release, verifies its sha256 against `tools-manifest.json`, and extracts it directly into `download-tools/` (e.g. `download-tools/yt-dlp/yt-dlp.exe`). Tools without an official standalone Windows binary (yutto, streamlink, gallery-dl) are not shipped as assets; the script prints their pip installation guidance. MediaHarbor core never downloads tools implicitly at runtime.
-- The stable agent-facing CLI is `python mediaharbor.py` from the repository root (see "Agent-Facing CLI"). Internal scripts under `skill/mediaharbor/scripts/` are compatibility/internal entry points, not a public API.
+- Tools: verified open-source tools are distributed as zip assets of the Untitled GitHub Release (`tools-windows-x64-v1`) and fetched with `python scripts/fetch_tools.py` on first use. The script downloads each zip from the project release, verifies its sha256 against `tools-manifest.json`, and extracts it directly into `download-tools/` (e.g. `download-tools/yt-dlp/yt-dlp.exe`). Tools without an official standalone Windows binary (yutto, streamlink, gallery-dl) are not shipped as assets; the script prints their pip installation guidance. Untitled core never downloads tools implicitly at runtime.
+- The stable agent-facing CLI is `python untitled.py` from the repository root (see "Agent-Facing CLI"). Internal scripts under `skill/untitled/scripts/` are compatibility/internal entry points, not a public API.
 
 ## Roles
 
 - **Agent (this model)**: understands the script, generates search terms, searches and filters candidate URLs, submits download tasks, organizes and reports.
-- **MediaHarbor core**: discovers and checks tools, invokes download tools under controlled subprocesses, provides limited failover, media validation, archiving, and reporting.
+- **Untitled core**: discovers and checks tools, invokes download tools under controlled subprocesses, provides limited failover, media validation, archiving, and reporting.
 - **Human editor**: judges material relevance, quality, and copyright suitability, and performs the final editing. Human review is not a mandatory security gate before each download.
 
 ## Default Workflow (end to end)
@@ -39,14 +39,14 @@ The human provides an existing script or text and asks to find matching video ma
 - Designed for a local, single-user experimental workspace controlled by the operator.
 - The Agent may submit and download supported candidates unattended; per-URL human approval is not required.
 - Bilibili and YouTube are the default search scope, not a hard hostname allowlist in the download core; other URLs are processed only when explicitly supported by `routing.json`, configured backends, and local tools.
-- Do not expose MediaHarbor as a public arbitrary-URL download API or accept tasks from untrusted multi-user sources.
+- Do not expose Untitled as a public arbitrary-URL download API or accept tasks from untrusted multi-user sources.
 
 ## Directory Layout
 
 ```
-MediaHarbor/  (repository root = workspace root)
+Untitled/  (repository root = workspace root)
 鈹溾攢 AGENT_READ_ME_FIRST.md     # Agent entry point (read first)
-鈹溾攢 skill/mediaharbor/         # The skill
+鈹溾攢 skill/untitled/         # The skill
 鈹? 鈹溾攢 SKILL.md                # Unique authoritative skill document (this file)
 鈹? 鈹斺攢 scripts/                # Runnable Python modules (no pip install needed)
 鈹溾攢 download-tools/            # Tool index (tools.json, routing.json) + tool binaries
@@ -68,7 +68,7 @@ Project names must be safe: no path separators, no path traversal (`..`), no Win
 Before downloading, run:
 
 ```bash
-python skill/mediaharbor/scripts/check_tools.py --json
+python skill/untitled/scripts/check_tools.py --json
 ```
 
 Returns `READY`, `DEGRADED`, or missing tool status. On first use, install the tools first:
@@ -156,15 +156,15 @@ The following reliability issues remain open; do not treat them as implemented:
 
 ## Agent-Facing CLI
 
-Run `python mediaharbor.py` from the repository root. Commands: `check-tools`, `project-create <name>`, `story-node-add <project> <title> [--description <text>]`, `story-node-list <project>`, `candidate-add <project> <url>`, `process <project>`, `status <project>`, and `run --project <name> --url <url>`. All commands output JSON with the fixed top-level fields `ok`, `status`, `data`, `error`. This is the only stable entry point recommended by this skill.
+Run `python untitled.py` from the repository root. Commands: `check-tools`, `project-create <name>`, `story-node-add <project> <title> [--description <text>]`, `story-node-list <project>`, `candidate-add <project> <url>`, `process <project>`, `status <project>`, and `run --project <name> --url <url>`. All commands output JSON with the fixed top-level fields `ok`, `status`, `data`, `error`. This is the only stable entry point recommended by this skill.
 
 ## Internal Entry Points
 
-The scripts under `skill/mediaharbor/scripts/` are internal compatibility entry points, not a public API; the CLI above is the recommended entry:
+The scripts under `skill/untitled/scripts/` are internal compatibility entry points, not a public API; the CLI above is the recommended entry:
 
 | Script | Purpose |
 |---|---|
-| `locate_root.py` | Print the MediaHarbor root path (3-marker, cwd-independent) |
+| `locate_root.py` | Print the Untitled root path (3-marker, cwd-independent) |
 | `check_tools.py` | Print tool availability status (READY/DEGRADED) |
 | `orchestrator.py` | Process the task queue (download 鈫?validate 鈫?hash 鈫?source.json 鈫?reports) |
 | `router.py` | Route a URL to backends per routing.json with failover |
