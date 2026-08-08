@@ -1,35 +1,108 @@
-# Tool Update Process
+# Tool Update and Release Process
 
-This document describes how Untitled tools are packaged, verified, published, and updated. Tools are hosted as zip assets of the Untitled GitHub Release `tools-windows-x64-v1`; the authoritative inventory is `tools-manifest.json`.
+This document defines how Untitled's Windows x64 tools are packaged, verified, published, and updated. `tools-manifest.json` is authoritative.
 
-## Principle
+## Distribution Rules
 
-- Only **official, open-source, free-to-use** tools are shipped.
-- Only tools with an **official standalone Windows binary** are shipped as assets (currently yt-dlp, FFmpeg/ffprobe, N_m3u8DL-RE).
-- Tools without one (yutto, streamlink, gallery-dl) are tracked in the manifest with `kind: pip` and installation guidance only.
-- Every asset is **sha256-pinned**; fetching is an explicit `scripts/fetch_tools.py` action, never an implicit runtime download.
+- Ship only official, open-source, free-to-use tools.
+- Ship ZIP assets only for tools with an official standalone Windows binary.
+- Track yutto, streamlink, and gallery-dl as `kind: pip`; install them explicitly into the active Python interpreter.
+- Pin every ZIP by SHA-256.
+- Never download tools implicitly during normal Untitled task processing.
+- Treat GitHub repository rename and Release migration as separately authorized operations.
 
-## Update workflow (when upstream publishes a new version)
+## Manifest Release State
 
-1. **Download the new official binary/zip** from upstream (e.g. yt-dlp GitHub release, BtbN FFmpeg-Builds, N_m3u8DL-RE release).
-2. **Verify locally on Windows x64**:
-   - `yt-dlp.exe --version` and a real probe: `yt-dlp --dump-json --skip-download <public url>`
-   - `ffmpeg -version`, `ffprobe -version`, and a real validation pass through Untitled (`python untitled.py run ...`)
-   - `N_m3u8DL-RE --version`
-   - Run the full validation suite: `powershell -ExecutionPolicy Bypass -File scripts/validate.ps1`
-3. **Repackage as a plain zip** laid out relative to `download-tools/` (e.g. `yt-dlp/yt-dlp.exe`, `ffmpeg/ffmpeg.exe` + `ffmpeg/ffprobe.exe` + `ffmpeg/LICENSE.txt`). Include the tool's license file.
-4. **Compute the sha256** of the zip and update `tools-manifest.json` (version, archive, sha256, and upstream metadata if changed).
-5. **Upload the new zip and a matching `SHA256SUMS.txt`** to the release `tools-windows-x64-v1` (replace the previous asset of the same name, or bump the archive name).
-6. **Verify**:
-   - `python scripts/fetch_tools.py --verify-manifest` — cross-checks manifest sha256 against the published `SHA256SUMS.txt` (also runs in CI once the release exists)
-   - `python scripts/fetch_tools.py --force` on a clean checkout — installs the new versions and reports `check_tools: READY`
-7. Update `download-tools/THIRD_PARTY_NOTICES.md` version table if it changed.
+`tools-manifest.json` must contain:
 
-## Automation aids
+```json
+"release_required": true
+```
 
-- `python scripts/fetch_tools.py --check-updates` queries upstream GitHub releases and reports whether a newer version exists for each manifest entry (best-effort; FFmpeg builds require manual review).
-- CI runs `scripts/fetch_tools.py --verify-manifest`; once the release exists it fails on sha256 drift between the manifest and the published `SHA256SUMS.txt`.
+Use `true` when README and installation instructions describe the Release as usable. In this mode:
 
-## Releasing (human action)
+- Missing `SHA256SUMS.txt` fails.
+- HTTP errors fail.
+- Missing ZIP assets fail.
+- Checksum drift fails.
 
-Creating the `tools-windows-x64-v1` release and uploading assets is a manual, human-authorized release step per the repository workflow (AgenticWonderwall: releases are human-only).
+`release_required: false` is permitted only for an explicitly documented pre-publication branch. It must not be merged while the normal installation path claims that Release assets are available.
+
+## Update Workflow
+
+1. Download official upstream binaries or archives.
+2. Verify locally on Windows x64:
+   - `yt-dlp.exe --version` and a real public-page probe.
+   - `ffmpeg -version` and `ffprobe -version`.
+   - A real Untitled media validation pass.
+   - `N_m3u8DL-RE --version`.
+3. Repackage ZIPs relative to `download-tools/` and include license files.
+4. Compute each ZIP SHA-256 and update version, archive, hash, license, upstream, and `provides` fields in `tools-manifest.json`.
+5. Place candidate release assets in a local directory.
+6. Validate and generate checksums:
+
+   ```powershell
+   python scripts/prepare_release_assets.py --asset-dir <directory>
+   ```
+
+7. Obtain explicit human authorization to create or modify the Release.
+8. Upload the ZIP assets and generated `SHA256SUMS.txt` to `tools-windows-x64-v1`.
+9. Verify the published Release:
+
+   ```powershell
+   python scripts/fetch_tools.py --verify-manifest
+   ```
+
+10. Use a clean Windows x64 clone to run:
+
+    ```powershell
+    python scripts/fetch_tools.py
+    python untitled.py check-tools
+    powershell -ExecutionPolicy Bypass -File scripts/cold_start_smoke.ps1
+    ```
+
+11. Run the full repository validation and independent Code Review.
+
+## Repository Rename Sequence
+
+Before the GitHub repository is renamed, the Release URL must reference the current real repository. After the human-authorized rename:
+
+1. Confirm default branch, Rulesets, required checks, permissions, Issues, PRs, and Release assets are intact.
+2. Update `release_base_url` to the new direct repository URL.
+3. Search the repository for the old owner/repository path.
+4. Verify the new URL directly; do not accept success that depends only on an old-URL redirect.
+5. Run strict Manifest verification and the Windows cold-start smoke again.
+
+## CI Contract
+
+CI runs:
+
+```bash
+python scripts/fetch_tools.py --verify-manifest
+```
+
+A published Release failure is a real CI failure. Do not catch 404 or network errors and silently convert them into a structural-only pass.
+
+## Human-Only Actions
+
+The following require explicit authorization under TheMasterplan workflow:
+
+- Rename the GitHub repository.
+- Create, modify, replace, or delete a Release or Release asset.
+- Create, move, or delete a Tag.
+- Merge the final PR.
+- Force-push or rewrite remote history.
+
+## Manifest and archive safety rules
+
+- Archive names and `provides` paths use normalized forward slashes only. Backslashes,
+  absolute paths, empty components, `.`/`..`, control characters, and Windows-invalid
+  path characters are rejected before download or extraction.
+- Archive file names must be unique across all zip-backed tools. Declared installation
+  destinations must also be unique across tools; one tool may not overwrite another.
+- Every declared ZIP member must occur exactly once. Missing or duplicate members fail
+  validation before any installation write.
+- Installation is transactional. Existing files are moved to a private backup directory,
+  staged files are installed, and failures trigger rollback. When rollback itself is
+  incomplete, the backup directory is preserved and its path is reported for manual
+  recovery; the last recoverable copy is never deleted silently.

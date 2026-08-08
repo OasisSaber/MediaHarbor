@@ -1,7 +1,8 @@
 {
   "schema_version": 1,
+  "release_required": true,
   "platform": "windows-x64",
-  "release_base_url": "https://github.com/OasisSaber/Untitled/releases/download/tools-windows-x64-v1",
+  "release_base_url": "https://github.com/OasisSaber/MediaHarbor/releases/download/tools-windows-x64-v1",
   "tools": {
     "yt-dlp": {
       "kind": "zip",

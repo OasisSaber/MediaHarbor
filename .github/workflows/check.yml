@@ -102,9 +102,10 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Validates tools-manifest.json structure always; once the
-      # tools-windows-x64-v1 release exists, also cross-checks the manifest
-      # sha256 values against the published SHA256SUMS.txt asset.
+      # Validates tools-manifest.json structure; because release_required is
+      # true, this job fails closed unless the tools-windows-x64-v1 release
+      # exists and the manifest sha256 values match the published
+      # SHA256SUMS.txt asset and every declared archive probes successfully.
       - name: Verify tools manifest
         run: python scripts/fetch_tools.py --verify-manifest
 
