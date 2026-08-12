@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $false)]
-    [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")),
+    [string]$RepositoryRoot = "",
 
     [Parameter(Mandatory = $false)]
     [string]$ReportPath = "",
@@ -11,6 +11,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+
+# $PSScriptRoot is not available inside parameter default-value expressions
+# (parameter binding runs before the script body), so resolve the default
+# repository root here.
+if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
+    $RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+}
 
 $root = (Resolve-Path $RepositoryRoot).Path
 $toolsRoot = Join-Path $root "download-tools"
