@@ -595,3 +595,120 @@ def test_incomplete_rollback_preserves_backup(monkeypatch, tmp_path):
     backups = list(tmp_path.glob(".tool-backup-*"))
     assert len(backups) == 1
     assert (backups[0] / member).read_bytes() == b"old"
+
+
+def _run_manifest_provides_rejection(tmp, provides, *, expect_ok=False):
+    """Run --verify-manifest against a manifest whose single zip tool declares
+    the given provides list; return the subprocess result."""
+    root = _setup_workspace(tmp)
+    _write_manifest(
+        root,
+        "https://invalid.invalid/not-published",
+        "tool.zip",
+        "0" * 64,
+        provides,
+        release_required=False,
+    )
+    return _run(root, "--verify-manifest")
+
+
+def test_rejects_windows_reserved_device_name():
+    result = _run_manifest_provides_rejection(tempfile.mkdtemp(), ["CON/tool.exe"])
+    assert result.returncode == 1
+    assert "Windows reserved device name" in result.stdout
+
+
+def test_rejects_reserved_name_with_extension():
+    result = _run_manifest_provides_rejection(tempfile.mkdtemp(), ["con.txt/tool.exe"])
+    assert result.returncode == 1
+    assert "Windows reserved device name" in result.stdout
+
+
+def test_rejects_trailing_dot():
+    result = _run_manifest_provides_rejection(tempfile.mkdtemp(), ["tool./tool.exe"])
+    assert result.returncode == 1
+    assert "trailing dot or space" in result.stdout
+
+
+def test_rejects_trailing_space():
+    result = _run_manifest_provides_rejection(tempfile.mkdtemp(), ["tool /tool.exe"])
+    assert result.returncode == 1
+    assert "trailing dot or space" in result.stdout
+
+
+def test_rejects_del_character():
+    result = _run_manifest_provides_rejection(tempfile.mkdtemp(), ["tool\x7f/tool.exe"])
+    assert result.returncode == 1
+    assert "control characters are not allowed" in result.stdout
+
+
+def test_rejects_case_insensitive_destination_collision():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = _setup_workspace(tmp)
+        manifest = {
+            "schema_version": 1,
+            "release_required": False,
+            "release_base_url": "https://invalid.invalid/not-published",
+            "tools": {
+                "one": {
+                    "kind": "zip",
+                    "version": "1",
+                    "archive": "one.zip",
+                    "sha256": "0" * 64,
+                    "license": "X",
+                    "upstream": "u",
+                    "provides": ["shared/Tool.Exe"],
+                },
+                "two": {
+                    "kind": "zip",
+                    "version": "1",
+                    "archive": "two.zip",
+                    "sha256": "1" * 64,
+                    "license": "X",
+                    "upstream": "u",
+                    "provides": ["shared/tool.exe"],
+                },
+            },
+        }
+        (root / "tools-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+        result = _run(root, "--verify-manifest")
+
+        assert result.returncode == 1
+        assert "duplicate destination" in result.stdout
+        assert "case-insensitive" in result.stdout
+
+
+def test_accepts_distinct_safe_windows_paths():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = _setup_workspace(tmp)
+        manifest = {
+            "schema_version": 1,
+            "release_required": False,
+            "release_base_url": "https://invalid.invalid/not-published",
+            "tools": {
+                "one": {
+                    "kind": "zip",
+                    "version": "1",
+                    "archive": "one.zip",
+                    "sha256": "0" * 64,
+                    "license": "X",
+                    "upstream": "u",
+                    "provides": ["one/Tool.Exe"],
+                },
+                "two": {
+                    "kind": "zip",
+                    "version": "1",
+                    "archive": "two.zip",
+                    "sha256": "1" * 64,
+                    "license": "X",
+                    "upstream": "u",
+                    "provides": ["two/tool.exe"],
+                },
+            },
+        }
+        (root / "tools-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+        result = _run(root, "--verify-manifest")
+
+        assert result.returncode == 0
