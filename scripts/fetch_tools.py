@@ -45,6 +45,14 @@ PIP_FIELDS = {"package"}
 HEX_64_RE = re.compile(r"^[0-9a-f]{64}$")
 MODULE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*$")
 WINDOWS_ILLEGAL_PATH_CHARS = set('<>:"|?*')
+WINDOWS_RESERVED_DEVICE_NAMES = {
+    "con",
+    "prn",
+    "aux",
+    "nul",
+    *(f"com{i}" for i in range(1, 10)),
+    *(f"lpt{i}" for i in range(1, 10)),
+}
 
 
 class FetchError(RuntimeError):
@@ -104,8 +112,17 @@ def _validate_archive_member_path(member: str, *, context: str) -> PurePosixPath
     components = member.split("/")
     if any(component in {"", ".", ".."} for component in components):
         raise FetchError(f"{context}: unsafe path: {member}")
-    if any(any(ord(char) < 32 for char in component) for component in components):
+    if any(
+        any(ord(char) < 32 or ord(char) == 0x7F for char in component) for component in components
+    ):
         raise FetchError(f"{context}: control characters are not allowed: {member!r}")
+    if any(component.endswith((".", " ")) for component in components):
+        raise FetchError(f"{context}: trailing dot or space is not allowed: {member!r}")
+    if any(
+        component.split(".", 1)[0].casefold() in WINDOWS_RESERVED_DEVICE_NAMES
+        for component in components
+    ):
+        raise FetchError(f"{context}: Windows reserved device name: {member!r}")
     has_illegal = any(
         any(char in WINDOWS_ILLEGAL_PATH_CHARS for char in component) for component in components
     )
@@ -132,12 +149,16 @@ def _validate_manifest_inventory(tools: dict[str, dict]) -> None:
             )
         archives[archive] = name
         for member in entry["provides"]:
-            previous_tool = destinations.get(member)
+            # Windows destination paths are case-insensitive: treat
+            # "A.exe" and "a.exe" as the same destination.
+            key = member.casefold()
+            previous_tool = destinations.get(key)
             if previous_tool is not None:
                 raise FetchError(
-                    f"duplicate destination '{member}' used by tools '{previous_tool}' and '{name}'"
+                    f"duplicate destination '{member}' (case-insensitive) used by "
+                    f"tools '{previous_tool}' and '{name}'"
                 )
-            destinations[member] = name
+            destinations[key] = name
 
 
 def validate_entry(name: str, entry: dict) -> None:
