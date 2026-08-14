@@ -1,5 +1,12 @@
 # Untitled Release Readiness Plan
 
+> **状态：全部阶段已完成（2026-08-15）。**
+> Phase 1 → #64/#65 合并；Phase 2 → 独立评审（READY TO MERGE）；Phase 3 → 人类决定 Squash Merge；
+> Phase 4 → 2026-08-12 仓库改名 OasisSaber/MediaHarbor → OasisSaber/Untitled；Phase 5 → PR #68 direct URL；
+> Phase 6 → Release 身份更新（title/body → Untitled，资产/digest 不变）+ post-rename fresh cold-start PASS
+> + 真实公开样本 E2E PASS + 最终 RC 聚合 PASS（release_candidate: true）+ 独立评审 APPROVE。
+> 本文件保留为流程记录，不再表示进行中的发布状态。
+
 ## Purpose
 
 Move Untitled from a source-migrated experimental build to a Windows x64 release candidate without combining code fixes, GitHub repository rename, and Release publication into one irreversible operation.
