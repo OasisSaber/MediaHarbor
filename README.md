@@ -92,9 +92,11 @@ powershell -ExecutionPolicy Bypass -File scripts/cold_start_smoke.ps1
 - 下载成功不代表素材适合剪辑，也不代表具备发布许可。
 - 不要让多个写进程并发操作同一个项目。
 
-## 仓库更名状态
+## 仓库身份
 
-源码身份已经是 Untitled。GitHub 仓库名称和 Release 迁移属于单独的人类授权操作。在远端仓库真正改名之前，`tools-manifest.json` 必须指向当前真实存在的仓库，不能提前指向未来地址，也不能把 GitHub 旧地址重定向当作长期配置。
+远端仓库已正式命名为 OasisSaber/Untitled（2026-08-12 由 OasisSaber/MediaHarbor 改名）。
+`tools-manifest.json` 的 `release_base_url` 使用 Untitled 新地址直链。GitHub 对旧地址
+提供重定向，但不得依赖旧地址长期可用；迁移历史文档（如 docs/untitled-migration.md）保留旧名记录。
 
 ## License
 
