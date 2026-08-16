@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "skill" / "untitled" / "scripts"
+SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "skill" / "bagitup" / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 

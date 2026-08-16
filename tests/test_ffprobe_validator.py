@@ -13,7 +13,7 @@ def test_resolve_ffprobe_via_subprocess():
             sys.executable,
             "-c",
             "import sys; sys.path.insert(0, r'"
-            + str(REPO_ROOT / "skill" / "untitled" / "scripts")
+            + str(REPO_ROOT / "skill" / "bagitup" / "scripts")
             + "'); from ffprobe_validator import resolve_ffprobe; r = resolve_ffprobe(); print(r)",
         ],
         capture_output=True,
@@ -29,7 +29,7 @@ def test_validate_nonexistent_file():
             sys.executable,
             "-c",
             "import sys; sys.path.insert(0, r'"
-            + str(REPO_ROOT / "skill" / "untitled" / "scripts")
+            + str(REPO_ROOT / "skill" / "bagitup" / "scripts")
             + "'); from pathlib import Path; from ffprobe_validator import validate_media; "
             "r = validate_media(Path('/nonexistent/file.mp4')); print(r.status)",
         ],
@@ -46,7 +46,7 @@ def test_get_media_info():
             sys.executable,
             "-c",
             "import sys; sys.path.insert(0, r'"
-            + str(REPO_ROOT / "skill" / "untitled" / "scripts")
+            + str(REPO_ROOT / "skill" / "bagitup" / "scripts")
             + "'); from ffprobe_validator import get_media_info; "
             "data = {'format': {'duration': '30.5', 'size': '1000'}, "
             "'streams': [{'codec_type': 'video', 'width': 1920, 'height': 1080}, "

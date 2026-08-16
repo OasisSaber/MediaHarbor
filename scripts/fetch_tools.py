@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Fetch and verify Untitled download tools.
+"""Fetch and verify BagItUp download tools.
 
 ZIP-backed tools are published in the GitHub Release declared by
 ``tools-manifest.json``. Python-module tools are installed explicitly into the
-active interpreter and are never downloaded implicitly by Untitled.
+active interpreter and are never downloaded implicitly by BagItUp.
 
 Usage:
     python scripts/fetch_tools.py [--tool NAME] [--force] [--root DIR]
@@ -37,7 +37,7 @@ TOOLS_DIR = "download-tools"
 CHECKSUMS_ASSET = "SHA256SUMS.txt"
 NETWORK_TIMEOUT = 30
 DOWNLOAD_TIMEOUT = 300
-USER_AGENT = "Untitled-tool-fetcher/1"
+USER_AGENT = "BagItUp-tool-fetcher/1"
 
 REQUIRED_FIELDS = {"kind", "version", "license", "upstream"}
 ZIP_FIELDS = {"archive", "sha256", "provides"}
@@ -332,14 +332,14 @@ def fetch_tool(root: Path, name: str, entry: dict, force: bool = False) -> str:
         return (
             f"tool '{name}' is Python-module backed; install it into the current "
             f"interpreter with `{sys.executable} -m pip install {entry['package']}`; "
-            "then rerun `python untitled.py check-tools`"
+            "then rerun `python bagitup.py check-tools`"
         )
     if tool_installed(root, entry) and not force:
         return f"tool '{name}' already installed (use --force to reinstall)"
 
     manifest = load_manifest(root)
     base_url = manifest["release_base_url"]
-    with tempfile.TemporaryDirectory(prefix="untitled-download-") as download_tmp:
+    with tempfile.TemporaryDirectory(prefix="bagitup-download-") as download_tmp:
         archive_path = Path(download_tmp) / entry["archive"]
         download_asset(base_url, entry["archive"], archive_path)
         actual = sha256_of(archive_path)
@@ -502,10 +502,10 @@ def verify_manifest(root: Path) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Fetch Untitled tools from the project release")
+    parser = argparse.ArgumentParser(description="Fetch BagItUp tools from the project release")
     parser.add_argument("--tool", help="Only fetch this tool (default: all missing zip tools)")
     parser.add_argument("--force", action="store_true", help="Reinstall even if present")
-    parser.add_argument("--root", type=Path, default=DEFAULT_ROOT, help="Untitled root")
+    parser.add_argument("--root", type=Path, default=DEFAULT_ROOT, help="BagItUp root")
     parser.add_argument("--check", action="store_true", help="Report tool status, do not download")
     parser.add_argument(
         "--check-updates", action="store_true", help="Query upstream latest versions"
@@ -560,7 +560,7 @@ def main(argv: list[str] | None = None) -> int:
                 failed = True
 
         if not args.tool and not failed:
-            sys.path.insert(0, str((args.root / "skill" / "untitled" / "scripts").resolve()))
+            sys.path.insert(0, str((args.root / "skill" / "bagitup" / "scripts").resolve()))
             from _common import check_tools, load_registry
 
             registry = load_registry(args.root)

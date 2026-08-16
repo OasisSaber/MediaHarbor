@@ -1,5 +1,5 @@
 [project]
-name = "untitled"
+name = "bagitup"
 version = "0.1.0"
 description = "Portable video material collection toolkit for AI agents"
 requires-python = ">=3.11"

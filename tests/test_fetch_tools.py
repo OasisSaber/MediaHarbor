@@ -30,8 +30,8 @@ def _setup_workspace(tmp: str) -> Path:
     (root / "AGENT_READ_ME_FIRST.md").write_text("", encoding="utf-8")
     (root / "download-tools").mkdir(parents=True, exist_ok=True)
     (root / "download-tools" / "tools.json").write_text(TOOLS_JSON, encoding="utf-8")
-    (root / "skill" / "untitled" / "scripts").mkdir(parents=True, exist_ok=True)
-    (root / "skill" / "untitled" / "SKILL.md").write_text(
+    (root / "skill" / "bagitup" / "scripts").mkdir(parents=True, exist_ok=True)
+    (root / "skill" / "bagitup" / "SKILL.md").write_text(
         "---\ntitle: test\n---\n", encoding="utf-8"
     )
     return root
@@ -97,7 +97,7 @@ def _run(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def _load_fetch_module():
-    spec = importlib.util.spec_from_file_location("untitled_fetch_tools_test", FETCH)
+    spec = importlib.util.spec_from_file_location("bagitup_fetch_tools_test", FETCH)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -244,7 +244,7 @@ def test_pip_tool_prints_active_interpreter_guidance():
 
         assert result.returncode == 0
         assert "-m pip install yutto" in result.stdout
-        assert "untitled.py check-tools" in result.stdout
+        assert "bagitup.py check-tools" in result.stdout
 
 
 def test_unknown_tool_returns_actionable_error():

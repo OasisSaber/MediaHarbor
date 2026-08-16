@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-SCRIPTS = Path(__file__).resolve().parent.parent / "skill" / "untitled" / "scripts"
+SCRIPTS = Path(__file__).resolve().parent.parent / "skill" / "bagitup" / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 

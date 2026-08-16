@@ -1,29 +1,29 @@
 ---
-name: untitled
-description: Collect video editing materials for an existing script with Untitled: analyze the script for people, events, years, locations and visual needs, generate search terms, search candidate video pages, enqueue candidates, download through controlled local tools, validate with ffprobe, archive, and hand off to a human editor. Trigger when the user provides a script or copy and asks to find, download, or collect video materials, or explicitly activates Untitled.
+name: bagitup
+description: Collect video editing materials for an existing script with BagItUp: analyze the script for people, events, years, locations and visual needs, generate search terms, search candidate video pages, enqueue candidates, download through controlled local tools, validate with ffprobe, archive, and hand off to a human editor. Trigger when the user provides a script or copy and asks to find, download, or collect video materials, or explicitly activates BagItUp.
 ---
 
-# Untitled Skill
+# BagItUp Skill
 
 ## Trigger
 
-The human provides an existing script or text and asks to find matching video materials, or explicitly activates Untitled for material collection.
+The human provides an existing script or text and asks to find matching video materials, or explicitly activates BagItUp for material collection.
 
 ## Scope and Installation
 
-- Untitled is a local, single-user, Windows x64-first Agent Skill source repository.
+- BagItUp is a local, single-user, Windows x64-first Agent Skill source repository.
 - Current official platform: Windows x64 only.
 - Runtime requirements: Windows x64, Python 3.11+, and local third-party tools configured by `download-tools/tools.json` and `tools-manifest.json`.
-- Deployment: clone the complete repository into the Agent workspace. Untitled itself has no package installation or build step.
-- The stable Agent-facing CLI is `python untitled.py` from the repository root.
-- Internal scripts under `skill/untitled/scripts/` are compatibility and implementation entry points, not a stable public API.
-- ZIP-backed tools are fetched only by the explicit `python scripts/fetch_tools.py` action. Untitled core never downloads or upgrades tools implicitly during task processing.
+- Deployment: clone the complete repository into the Agent workspace. BagItUp itself has no package installation or build step.
+- The stable Agent-facing CLI is `python bagitup.py` from the repository root.
+- Internal scripts under `skill/bagitup/scripts/` are compatibility and implementation entry points, not a stable public API.
+- ZIP-backed tools are fetched only by the explicit `python scripts/fetch_tools.py` action. BagItUp core never downloads or upgrades tools implicitly during task processing.
 - Python-module tools such as yutto, streamlink, and gallery-dl are resolved in the active interpreter and invoked as `[sys.executable, "-m", module]`.
 
 ## Roles
 
 - **Agent**: understands the supplied script, generates search terms, searches and filters candidate pages, submits tasks, organizes results, and reports coverage.
-- **Untitled core**: checks tools, probes candidates, invokes controlled subprocesses, applies bounded fallback, validates media, archives artifacts, persists state, and generates reports.
+- **BagItUp core**: checks tools, probes candidates, invokes controlled subprocesses, applies bounded fallback, validates media, archives artifacts, persists state, and generates reports.
 - **Human editor**: judges relevance, narrative fit, quality, and copyright suitability, and performs final editing. A successful download is not editorial approval.
 
 ## Default Workflow
@@ -43,16 +43,16 @@ The human provides an existing script or text and asks to find matching video ma
 
 - Designed for an operator-controlled local single-user workspace.
 - The Agent may submit supported candidates without per-URL human approval.
-- Do not expose Untitled as a public arbitrary-URL download API or accept tasks from untrusted multi-user sources.
+- Do not expose BagItUp as a public arbitrary-URL download API or accept tasks from untrusted multi-user sources.
 - Other URLs are processed only when supported by `download-tools/routing.json`, configured backends, and locally available tools.
 
 ## Directory Layout
 
 ```text
-Untitled/
+BagItUp/
 |-- AGENT_READ_ME_FIRST.md
-|-- untitled.py
-|-- skill/untitled/
+|-- bagitup.py
+|-- skill/bagitup/
 |   |-- SKILL.md
 |   `-- scripts/
 |-- download-tools/
@@ -97,8 +97,8 @@ python scripts/fetch_tools.py
 Check runtime availability:
 
 ```bash
-python untitled.py check-tools
-python skill/untitled/scripts/check_tools.py --json
+python bagitup.py check-tools
+python skill/bagitup/scripts/check_tools.py --json
 ```
 
 Required tools:
@@ -219,16 +219,16 @@ Reports refresh after each queue-processing round.
 
 - Official platform support remains Windows x64 only.
 - Release availability and third-party site behavior can interrupt cold start or downloads.
-- Python-module tools must be installed into the same interpreter used to run Untitled.
+- Python-module tools must be installed into the same interpreter used to run BagItUp.
 - There is no cross-process project lock; do not run multiple writers against the same project concurrently.
 - Credential redaction is defense in depth and may not recognize every possible structured or bearer-token representation.
 - Visual analysis may produce false positives or false negatives and never substitutes for human review.
-- Project output data remains schema version 1; no data migration is implied by the Untitled source rename.
+- Project output data remains schema version 1; no data migration is implied by the BagItUp source rename.
 - `drm_stop` remains part of routing schema compatibility; current runtime hard-stops DRM, authentication, and geographic restriction failures.
 
 ## Agent-Facing CLI
 
-Run `python untitled.py` from the repository root.
+Run `python bagitup.py` from the repository root.
 
 Commands:
 
@@ -247,7 +247,7 @@ All commands return the fixed top-level JSON fields `ok`, `status`, `data`, and 
 
 | Script | Purpose |
 |---|---|
-| `locate_root.py` | Locate the Untitled workspace root. |
+| `locate_root.py` | Locate the BagItUp workspace root. |
 | `check_tools.py` | Report runtime tool availability. |
 | `orchestrator.py` | Process the queue: download -> validate -> assess -> archive -> report. |
 | `router.py` | Match routes and apply bounded backend fallback. |
@@ -260,4 +260,4 @@ All commands return the fixed top-level JSON fields `ok`, `status`, `data`, and 
 
 ## Current Status
 
-Untitled is in an experimental release-candidate preparation phase. The core acquisition chain is implemented and tested. A release candidate additionally requires strict published-asset verification, a clean Windows x64 cold-start run, full validation, a real public-sample end-to-end drill, and an independent Code Review with no merge-blocking findings.
+BagItUp is in an experimental release-candidate preparation phase. The core acquisition chain is implemented and tested. A release candidate additionally requires strict published-asset verification, a clean Windows x64 cold-start run, full validation, a real public-sample end-to-end drill, and an independent Code Review with no merge-blocking findings.

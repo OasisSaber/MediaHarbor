@@ -1,6 +1,6 @@
 # Tool Update and Release Process
 
-This document defines how Untitled's Windows x64 tools are packaged, verified, published, and updated. `tools-manifest.json` is authoritative.
+This document defines how BagItUp's Windows x64 tools are packaged, verified, published, and updated. `tools-manifest.json` is authoritative.
 
 ## Distribution Rules
 
@@ -8,7 +8,7 @@ This document defines how Untitled's Windows x64 tools are packaged, verified, p
 - Ship ZIP assets only for tools with an official standalone Windows binary.
 - Track yutto, streamlink, and gallery-dl as `kind: pip`; install them explicitly into the active Python interpreter.
 - Pin every ZIP by SHA-256.
-- Never download tools implicitly during normal Untitled task processing.
+- Never download tools implicitly during normal BagItUp task processing.
 - Treat GitHub repository rename and Release migration as separately authorized operations.
 
 ## Manifest Release State
@@ -34,7 +34,7 @@ Use `true` when README and installation instructions describe the Release as usa
 2. Verify locally on Windows x64:
    - `yt-dlp.exe --version` and a real public-page probe.
    - `ffmpeg -version` and `ffprobe -version`.
-   - A real Untitled media validation pass.
+   - A real BagItUp media validation pass.
    - `N_m3u8DL-RE --version`.
 3. Repackage ZIPs relative to `download-tools/` and include license files.
 4. Compute each ZIP SHA-256 and update version, archive, hash, license, upstream, and `provides` fields in `tools-manifest.json`.
@@ -57,7 +57,7 @@ Use `true` when README and installation instructions describe the Release as usa
 
     ```powershell
     python scripts/fetch_tools.py
-    python untitled.py check-tools
+    python bagitup.py check-tools
     powershell -ExecutionPolicy Bypass -File scripts/cold_start_smoke.ps1
     ```
 

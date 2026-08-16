@@ -1,6 +1,6 @@
-# Untitled 自管手册（Self-Management）
+# BagItUp 自管手册（Self-Management）
 
-> 本文件是 Untitled 工作区的运维交接与自管说明，2026-08-16 由 DSH 接管时建立，
+> 本文件是 BagItUp 工作区的运维交接与自管说明，2026-08-16 由 DSH 接管时建立，
 > 与 TTS / Ollama / AirLLM / WSL 工作区同范式：README.md（项目手册）+
 > AGENTS.md（治理规则）+ manage 脚本（日常运维）。
 > 本文件是辅助材料，**不覆盖** 根 `AGENTS.md`、`core/`、`profiles/`、`adapters/`
@@ -8,10 +8,11 @@
 
 ## 一、这是什么
 
-- 项目：**Untitled**（远端 OasisSaber/Untitled，2026-08-12 由 MediaHarbor 改名）。
+- 项目：**BagItUp**（远端 OasisSaber/BagItUp，2026-08-12 由 MediaHarbor 改名，
+  2026-08-16 由 Untitled 更名）。
 - 定位：本地、单用户、Windows x64 优先的 Agent Skill 源码仓库 —— 根据已有文案
-  检索、下载、验证、整理视频素材（mediaharbor 工作流）。
-- 技术栈：Python 3.11+（`untitled.py` 是稳定 Agent 入口）、外部下载工具 CLI、
+  检索、下载、验证、整理视频素材（bagitup 工作流）。
+- 技术栈：Python 3.11+（`bagitup.py` 是稳定 Agent 入口）、外部下载工具 CLI、
   FFmpeg/ffprobe、JSON/JSONL、Markdown。无构建/安装步骤，克隆即用。
 - 验证入口：`bash scripts/validate.sh`（权威）与 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/validate.ps1`（Windows 等价入口）。
 - 发布候选另需 `scripts/cold_start_smoke.ps1`（干净 Windows x64 冷启动）。
@@ -24,7 +25,7 @@
 |---|---|
 | `status` | git 分支/工作树/远端 + 工具就绪摘要 |
 | `validate` | 跑权威验证 `scripts/validate.ps1`（Ruff format/lint + pytest + 冒烟） |
-| `check-tools` | `python untitled.py check-tools` 工具就绪明细 |
+| `check-tools` | `python bagitup.py check-tools` 工具就绪明细 |
 | `projects` | 列出 `output/` 下项目，区分真实项目与测试残留 |
 | `disk` | 仓库磁盘占用摘要（output / migration-backups / download-tools / .venv） |
 | `help` | 用法 |

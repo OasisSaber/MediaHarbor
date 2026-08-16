@@ -1,10 +1,10 @@
-# Untitled self-management entry point.
+# BagItUp self-management entry point.
 # ASCII-only output (GBK-safe), PowerShell 5.1 compatible. Run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/manage.ps1 <command>
 #
 # Commands:
 #   status        Git state (branch, remote, dirty files) + tool readiness summary
 #   validate      Run the authoritative validation entry (scripts/validate.ps1)
-#   check-tools   Show download tool readiness via untitled.py check-tools
+#   check-tools   Show download tool readiness via bagitup.py check-tools
 #   projects      List output/ projects (real vs test leftovers)
 #   disk          Show repository disk usage summary
 #   help          Show this help
@@ -36,8 +36,8 @@ function Show-Status {
     Write-Note "remotes:"
     git remote -v
     Write-Host ""
-    Write-Note "tool readiness (untitled.py check-tools):"
-    python untitled.py check-tools 2>&1 | Select-String -Pattern '"status"|"ready"|"required"|"error"' | Select-Object -First 20
+    Write-Note "tool readiness (bagitup.py check-tools):"
+    python bagitup.py check-tools 2>&1 | Select-String -Pattern '"status"|"ready"|"required"|"error"' | Select-Object -First 20
 }
 
 function Invoke-Validate {
@@ -51,7 +51,7 @@ function Invoke-Validate {
 }
 
 function Show-Tools {
-    python untitled.py check-tools
+    python bagitup.py check-tools
     exit $LASTEXITCODE
 }
 

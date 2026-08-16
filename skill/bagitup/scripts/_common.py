@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 MARKER_FILE = "AGENT_READ_ME_FIRST.md"
-SKILL_FILE = "skill/untitled/SKILL.md"
+SKILL_FILE = "skill/bagitup/SKILL.md"
 TOOLS_JSON_REL = "download-tools/tools.json"
 TOOLS_FILE = "tools.json"
 SUPPORTED_SCHEMA_VERSION = 1
@@ -94,7 +94,7 @@ def find_project_root(start: Path | None = None) -> Path:
                 return parent
 
     raise RuntimeError(
-        f"Cannot find Untitled root: {MARKER_FILE}, {SKILL_FILE}, "
+        f"Cannot find BagItUp root: {MARKER_FILE}, {SKILL_FILE}, "
         f"{TOOLS_JSON_REL} not found from {start}"
     )
 

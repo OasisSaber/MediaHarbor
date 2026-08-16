@@ -1,4 +1,4 @@
-# Contributing to Untitled
+# Contributing to BagItUp
 
 开始前读取 [AGENTS.md](AGENTS.md)。Agent 操作遵循本仓库的工作流与验证要求。
 

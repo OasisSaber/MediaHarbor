@@ -12,13 +12,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 def _setup_temp_root(dst: Path):
     (dst / "AGENT_READ_ME_FIRST.md").write_text("")
     (dst / "download-tools").mkdir(parents=True, exist_ok=True)
-    (dst / "skill" / "untitled").mkdir(parents=True, exist_ok=True)
-    (dst / "skill" / "untitled" / "SKILL.md").write_text(
-        "---\ntitle: test\n---\n", encoding="utf-8"
-    )
-    scripts_dir = dst / "skill" / "untitled" / "scripts"
+    (dst / "skill" / "bagitup").mkdir(parents=True, exist_ok=True)
+    (dst / "skill" / "bagitup" / "SKILL.md").write_text("---\ntitle: test\n---\n", encoding="utf-8")
+    scripts_dir = dst / "skill" / "bagitup" / "scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
-    src = REPO_ROOT / "skill" / "untitled" / "scripts"
+    src = REPO_ROOT / "skill" / "bagitup" / "scripts"
     for fname in ["_common.py", "check_tools.py"]:
         (scripts_dir / fname).write_text(
             (src / fname).read_text(encoding="utf-8"), encoding="utf-8"
@@ -30,7 +28,7 @@ def test_check_tools_json_output():
         [sys.executable, "check_tools.py", "--json"],
         capture_output=True,
         text=True,
-        cwd=str(REPO_ROOT / "skill" / "untitled" / "scripts"),
+        cwd=str(REPO_ROOT / "skill" / "bagitup" / "scripts"),
     )
     assert result.returncode == 0, f"stderr: {result.stderr}"
     data = json.loads(result.stdout)
@@ -61,7 +59,7 @@ def test_missing_required_tools_returns_degraded():
         result = subprocess.run(
             [
                 sys.executable,
-                str(root / "skill" / "untitled" / "scripts" / "check_tools.py"),
+                str(root / "skill" / "bagitup" / "scripts" / "check_tools.py"),
                 "--json",
             ],
             capture_output=True,
@@ -95,7 +93,7 @@ def test_missing_optional_tools_do_not_cause_error():
         result = subprocess.run(
             [
                 sys.executable,
-                str(root / "skill" / "untitled" / "scripts" / "check_tools.py"),
+                str(root / "skill" / "bagitup" / "scripts" / "check_tools.py"),
                 "--json",
             ],
             capture_output=True,
@@ -134,7 +132,7 @@ def test_fake_executable_is_recognized():
         result = subprocess.run(
             [
                 sys.executable,
-                str(root / "skill" / "untitled" / "scripts" / "check_tools.py"),
+                str(root / "skill" / "bagitup" / "scripts" / "check_tools.py"),
                 "--json",
             ],
             capture_output=True,
@@ -165,7 +163,7 @@ def test_output_dir_created_on_demand():
             )
         )
 
-        script_path = rt / "skill" / "untitled" / "scripts" / "check_tools.py"
+        script_path = rt / "skill" / "bagitup" / "scripts" / "check_tools.py"
         result = subprocess.run(
             [sys.executable, str(script_path), "--json"],
             capture_output=True,
@@ -180,7 +178,7 @@ def test_json_output_is_parseable():
         [sys.executable, "locate_root.py", "--json"],
         capture_output=True,
         text=True,
-        cwd=str(REPO_ROOT / "skill" / "untitled" / "scripts"),
+        cwd=str(REPO_ROOT / "skill" / "bagitup" / "scripts"),
     )
     assert result.returncode == 0
     data = json.loads(result.stdout)
@@ -190,7 +188,7 @@ def test_json_output_is_parseable():
         [sys.executable, "check_tools.py", "--json"],
         capture_output=True,
         text=True,
-        cwd=str(REPO_ROOT / "skill" / "untitled" / "scripts"),
+        cwd=str(REPO_ROOT / "skill" / "bagitup" / "scripts"),
     )
     assert result.returncode == 0
     data = json.loads(result.stdout)

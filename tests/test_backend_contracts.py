@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skill" / "untitled" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skill" / "bagitup" / "scripts"))
 
 from process_runner import SUCCESS, AttemptInfo, BackendResult, ProcessResult
 

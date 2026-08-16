@@ -1,8 +1,8 @@
 # Download Tools
 
-This directory holds the tool inventory, routing configuration, and the installed tool binaries for Untitled.
+This directory holds the tool inventory, routing configuration, and the installed tool binaries for BagItUp.
 
-**Verified open-source tools are distributed as zip assets of the Untitled GitHub Release** (`tools-windows-x64-v1`). They are not committed to git. Install them with:
+**Verified open-source tools are distributed as zip assets of the BagItUp GitHub Release** (`tools-windows-x64-v1`). They are not committed to git. Install them with:
 
 ```powershell
 python scripts/fetch_tools.py
@@ -40,4 +40,4 @@ Routes match URLs in order; the first hit wins. Default routes:
 
 Editing the routing table only allows whitelisted backend names and validated regex; invalid entries reject the whole table.
 
-Invocation templates, artifact discovery, and routing semantics are documented in `../skill/untitled/SKILL.md`. Tool update workflow: `../docs/tool-update-process.md`.
+Invocation templates, artifact discovery, and routing semantics are documented in `../skill/bagitup/SKILL.md`. Tool update workflow: `../docs/tool-update-process.md`.
