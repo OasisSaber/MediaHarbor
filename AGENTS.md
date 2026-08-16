@@ -2,7 +2,7 @@
 
 > 本文件是本仓库唯一入口：定义加载顺序与分域权威，不复制规则正文。
 > 规则分布：
-> - 任务来源、工作区检查、验证真实性、diff 审阅、自审与交接：[core/workflow.md](core/workflow.md)
+> - 任务来源、治理所有权预检、工作区检查、验证真实性、diff 审阅、自审与交接：[core/workflow.md](core/workflow.md)
 > - 权限与聚合授权、外部写操作边界、人类审批门、发布事务、安全停止条件：[core/policy.md](core/policy.md)
 > - Git 发布执行命令：[profiles/git.md](profiles/git.md)
 > - Harness 映射：[adapters/generic.md](adapters/generic.md)
@@ -26,8 +26,8 @@
   pwsh -NoProfile -File scripts/validate.ps1
   ```
 - 合并方式：只接受人类决定的 Squash Merge
-- 工作流来源：TheMasterplan v3.0.0（https://github.com/OasisSaber/TheMasterplan）
-- 采用日期：2026-08-03
+- 工作流来源：TheMasterplan v4.0.0（https://github.com/OasisSaber/TheMasterplan）
+- 采用日期：2026-08-03；采用集同步：2026-08-15（v4.0.0：新增治理所有权预检 §0、PR CI 通过门、薄 Harness 边界）
 - GitHub Actions 消费者接口：`.github/workflows/check.yml` 的 `themasterplan-check`
   job 通过 `uses: OasisSaber/TheMasterplan/.github/workflows/themasterplan-check.yml@v4.0.0`
   调用中央可重用工作流（固定版本调用，`policy-ref: v4.0.0` 与 uses 引用版本一致），
@@ -56,7 +56,7 @@
 开始工作前按以下顺序加载：
 
 1. 根部 `AGENTS.md`（本文件）；
-2. [core/workflow.md](core/workflow.md)（任务来源、工作区、验证、自审）；
+2. [core/workflow.md](core/workflow.md)（任务来源、治理所有权预检、工作区、验证、自审）；
 3. [core/policy.md](core/policy.md)（授权与发布）；
 4. 项目采用的 [profiles/git.md](profiles/git.md)（Git 命令）与
    [adapters/generic.md](adapters/generic.md)（Harness 映射）；
