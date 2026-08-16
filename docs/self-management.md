@@ -77,8 +77,9 @@
   相关）；失败时改用 `gh` CLI（正常）或检查 credential helper，不要反复重试 git。
 - 平台只正式支持 Windows x64；Ubuntu GitHub Actions（`scripts/ci-check.sh`）仅
   表示纯 Python 测试可运行，不是 Linux 支持声明。
-- CI 消费者：`.github/workflows/check.yml` 的 `aw-check` job 经
-  `OasisSaber/TheMasterplan/.github/workflows/aw-check.yml@v1` 调用，
+- CI 消费者：`.github/workflows/check.yml` 的 `themasterplan-check` job 经
+  `OasisSaber/TheMasterplan/.github/workflows/themasterplan-check.yml@v4.0.0`
+  调用（`policy-ref: v4.0.0`，固定版本调用，uses 引用版本与 policy-ref 一致），
   `project-check-path` = `scripts/ci-check.sh`。
 
 ## 七、接管基线（2026-08-16）
