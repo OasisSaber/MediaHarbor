@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate local Untitled release assets and write SHA256SUMS.txt.
+"""Validate local BagItUp release assets and write SHA256SUMS.txt.
 
 This script never uploads or deletes a GitHub Release. It prepares a directory
 for the separately authorized human release step.

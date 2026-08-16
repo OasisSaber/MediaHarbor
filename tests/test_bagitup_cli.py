@@ -9,7 +9,7 @@ import uuid
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CLI = REPO_ROOT / "untitled.py"
+CLI = REPO_ROOT / "bagitup.py"
 
 
 def _setup_temp_workspace(tmp: str) -> None:
@@ -21,8 +21,8 @@ def _setup_temp_workspace(tmp: str) -> None:
         '"platforms": {"windows-x64": "dummy/dummy.exe"}}}}'
     )
     (root / "download-tools" / "tools.json").write_text(tools_json)
-    (root / "skill" / "untitled").mkdir(parents=True, exist_ok=True)
-    (root / "skill" / "untitled" / "SKILL.md").write_text(
+    (root / "skill" / "bagitup").mkdir(parents=True, exist_ok=True)
+    (root / "skill" / "bagitup" / "SKILL.md").write_text(
         "---\ntitle: test\n---\n", encoding="utf-8"
     )
 

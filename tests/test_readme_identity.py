@@ -13,12 +13,12 @@ def _read_first_heading(path: Path) -> str:
     return ""
 
 
-def test_readme_identifies_untitled() -> None:
+def test_readme_identifies_bagitup() -> None:
     assert README.is_file(), f"README.md not found at {README}"
 
     first_heading = _read_first_heading(README)
-    assert first_heading == "# Untitled", (
-        f"Expected first non-empty line to be '# Untitled', got {first_heading!r}"
+    assert first_heading == "# BagItUp", (
+        f"Expected first non-empty line to be '# BagItUp', got {first_heading!r}"
     )
 
 

@@ -22,13 +22,13 @@ if ([string]::IsNullOrWhiteSpace($RepositoryRoot)) {
 $root = (Resolve-Path $RepositoryRoot).Path
 $toolsRoot = Join-Path $root "download-tools"
 $fetchScript = Join-Path $root "scripts\fetch_tools.py"
-$cli = Join-Path $root "untitled.py"
+$cli = Join-Path $root "bagitup.py"
 
 if (-not (Test-Path $fetchScript -PathType Leaf)) {
     throw "fetch_tools.py not found: $fetchScript"
 }
 if (-not (Test-Path $cli -PathType Leaf)) {
-    throw "untitled.py not found: $cli"
+    throw "bagitup.py not found: $cli"
 }
 
 $installedFiles = Get-ChildItem $toolsRoot -Recurse -File -ErrorAction SilentlyContinue |
@@ -69,8 +69,8 @@ Push-Location $root
 try {
     Invoke-CheckedStep "verify-manifest" @("python", "scripts/fetch_tools.py", "--verify-manifest")
     Invoke-CheckedStep "fetch-tools" @("python", "scripts/fetch_tools.py")
-    Invoke-CheckedStep "cli-check-tools" @("python", "untitled.py", "check-tools")
-    Invoke-CheckedStep "cli-help" @("python", "untitled.py", "--help")
+    Invoke-CheckedStep "cli-check-tools" @("python", "bagitup.py", "check-tools")
+    Invoke-CheckedStep "cli-help" @("python", "bagitup.py", "--help")
     Invoke-CheckedStep "validate-powershell" @(
         "powershell", "-ExecutionPolicy", "Bypass", "-File", "scripts/validate.ps1"
     )

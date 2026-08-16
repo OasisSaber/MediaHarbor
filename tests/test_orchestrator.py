@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "skill" / "untitled" / "scripts"))
+sys.path.insert(0, str(REPO_ROOT / "skill" / "bagitup" / "scripts"))
 
 
 def _setup_temp_project(tmp: str):
@@ -20,8 +20,8 @@ def _setup_temp_project(tmp: str):
         '"platforms": {"windows-x64": "d/d.exe"}}}}'
     )
     (root / "download-tools" / "tools.json").write_text(tjson)
-    (root / "skill" / "untitled").mkdir(parents=True, exist_ok=True)
-    (root / "skill" / "untitled" / "SKILL.md").write_text("---\ntitle: t\n---\n", encoding="utf-8")
+    (root / "skill" / "bagitup").mkdir(parents=True, exist_ok=True)
+    (root / "skill" / "bagitup" / "SKILL.md").write_text("---\ntitle: t\n---\n", encoding="utf-8")
 
 
 def test_sha256_consistent():

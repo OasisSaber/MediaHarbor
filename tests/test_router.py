@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skill" / "untitled" / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skill" / "bagitup" / "scripts"))
 from process_runner import BackendResult
 from router import (
     RouteEntry,

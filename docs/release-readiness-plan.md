@@ -1,4 +1,4 @@
-# Untitled Release Readiness Plan
+# BagItUp Release Readiness Plan
 
 > **状态：全部阶段已完成（2026-08-15）。**
 > Phase 1 → #64/#65 合并；Phase 2 → 独立评审（READY TO MERGE）；Phase 3 → 人类决定 Squash Merge；
@@ -90,13 +90,13 @@ Verify or rebuild `tools-windows-x64-v1` with separately authorized human releas
 ```powershell
 python scripts/fetch_tools.py --verify-manifest
 python scripts/fetch_tools.py
-python untitled.py check-tools
+python bagitup.py check-tools
 powershell -ExecutionPolicy Bypass -File scripts/cold_start_smoke.ps1
 ```
 
 ## Completion Definition
 
-Untitled is a release candidate only when:
+BagItUp is a release candidate only when:
 
 - Source, documentation, repository, and Release identity are consistent.
 - Strict Manifest verification passes against the direct new URL.

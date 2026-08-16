@@ -10,8 +10,8 @@ from _common import SUPPORTED_SCHEMA_VERSION, ToolRegistry, load_registry
 
 def _setup_tmp(root: Path):
     (root / "AGENT_READ_ME_FIRST.md").write_text("")
-    (root / "skill" / "untitled").mkdir(parents=True, exist_ok=True)
-    (root / "skill" / "untitled" / "SKILL.md").write_text(
+    (root / "skill" / "bagitup").mkdir(parents=True, exist_ok=True)
+    (root / "skill" / "bagitup" / "SKILL.md").write_text(
         "---\ntitle: test\n---\n", encoding="utf-8"
     )
     (root / "download-tools").mkdir(parents=True, exist_ok=True)
