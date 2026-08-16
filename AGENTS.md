@@ -28,9 +28,10 @@
 - 合并方式：只接受人类决定的 Squash Merge
 - 工作流来源：TheMasterplan v3.0.0（https://github.com/OasisSaber/TheMasterplan）
 - 采用日期：2026-08-03
-- GitHub Actions 消费者接口：`.github/workflows/check.yml` 的 `aw-check` job 通过
-  `uses: OasisSaber/TheMasterplan/.github/workflows/aw-check.yml@v1` 调用中央可重用
-  工作流，`project-check-path` 固定为 `scripts/ci-check.sh`（CI 入口：先安装
+- GitHub Actions 消费者接口：`.github/workflows/check.yml` 的 `themasterplan-check`
+  job 通过 `uses: OasisSaber/TheMasterplan/.github/workflows/themasterplan-check.yml@v4.0.0`
+  调用中央可重用工作流（固定版本调用，`policy-ref: v4.0.0` 与 uses 引用版本一致），
+  `project-check-path` 固定为 `scripts/ci-check.sh`（CI 入口：先安装
   pytest/ruff 验证依赖——中央接口不安装调用方依赖——再调用权威验证入口
   `scripts/validate.sh`）
 
