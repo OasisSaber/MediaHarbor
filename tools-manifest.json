@@ -20,7 +20,7 @@
       "version": "n8.1.2-34-g9b6c8969e0 (2026-07-31 build)",
       "archive": "ffmpeg-n8.1.2-win64-lgpl.zip",
       "sha256": "411340f90a794dcfdd52e8228f4ecc34c052edc1766d27c84adff1c0446d68bf",
-      "license": "LGPL-2.1+",
+      "license": "LGPL-3.0-or-later",
       "upstream": "https://github.com/BtbN/FFmpeg-Builds",
       "provides": [
         "ffmpeg/ffmpeg.exe",
@@ -64,3 +64,4 @@
     }
   }
 }
+
